@@ -5,6 +5,8 @@ import { gradeLabel, levelLabel, money, schedule } from "@/demo/catalog";
 import { getPublicOffering, getPublicAcademy } from "@/modules/catalog/public";
 import { isDemoMode } from "@/server/config";
 import { DemoDialog } from "@/components/ui/dialog";
+import { Enroll } from "@/components/commerce/enroll";
+import { paymentReadiness } from "@/integrations/payments/provider";
 export default async function Detail({
   params,
 }: {
@@ -94,11 +96,12 @@ export default async function Detail({
               {demo
                 ? "표시된 일정·가격·잔여석은 합성 예시입니다."
                 : "수업 정보는 학원이 등록한 내용을 기준으로 합니다."}{" "}
-              결제·수강권 발급은 다음 단계에서 연결됩니다.
+              신청 시 연결된 자녀와 일정·금액을 다시 확인합니다.
             </p>
             <p className="muted">
-              실제 서비스의 환불·취소 기준과 학원 검토 정보는 운영 정책 확정 후
-              제공됩니다.
+              실제 결제는 운영 정책과 결제 서비스 설정이 완료된 후 제공됩니다.
+              내부 테스트에서는 시작 전 회차의 주문별 환불 정책을 확인할 수
+              있습니다.
             </p>
           </div>
         </section>
@@ -132,25 +135,32 @@ export default async function Detail({
             </small>
             <strong>{money(o.priceWon)}</strong>
           </div>
-          <DemoDialog
-            label={demo ? "수강 신청" : "수강 신청 안내"}
-            title={demo ? "데모 신청 안내" : "수강 신청 연동 준비 중"}
-          >
-            <p>
-              {demo
-                ? "선택한 수업은 가상 수업입니다."
-                : "학원이 공개한 수업 정보입니다."}{" "}
-              실제 결제 및 수강 신청은 아직 진행되지 않습니다.
-            </p>
-            <p className="muted">
-              학부모가 자녀와 수업 일정을 확인하고 신청하는 흐름을 미리
-              살펴보세요.
-            </p>
-            <Link className="text-link" href="/parent">
-              학부모 화면으로 →
-            </Link>
-          </DemoDialog>
-          <p className="caption">실제 결제 및 수강 불가</p>
+          {demo ? (
+            <DemoDialog
+              label={demo ? "수강 신청" : "수강 신청 안내"}
+              title={demo ? "데모 신청 안내" : "수강 신청 연동 준비 중"}
+            >
+              <p>
+                {demo
+                  ? "선택한 수업은 가상 수업입니다."
+                  : "학원이 공개한 수업 정보입니다."}{" "}
+                실제 결제 및 수강 신청은 아직 진행되지 않습니다.
+              </p>
+              <p className="muted">
+                학부모가 자녀와 수업 일정을 확인하고 신청하는 흐름을 미리
+                살펴보세요.
+              </p>
+              <Link className="text-link" href="/parent">
+                학부모 화면으로 →
+              </Link>
+            </DemoDialog>
+          ) : (
+            <Enroll
+              offeringId={o.id}
+              paymentConfigured={paymentReadiness().configured}
+            />
+          )}
+          {demo && <p className="caption">실제 결제 및 수강 불가</p>}
         </aside>
       </div>
     </main>

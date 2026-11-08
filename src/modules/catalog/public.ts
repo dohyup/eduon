@@ -46,7 +46,20 @@ export async function getPublicOffering(
       course: true,
       academy: { select: { name: true, region: true } },
       sessions: { orderBy: { startsAt: "asc" } },
-      _count: { select: { enrollments: { where: { status: "active" } } } },
+      _count: {
+        select: {
+          enrollments: {
+            where: { status: { in: ["active", "pending_payment"] } },
+          },
+          orders: {
+            where: {
+              status: "pending_payment",
+              expiresAt: { gt: new Date() },
+              reservation: { is: { status: "held" } },
+            },
+          },
+        },
+      },
     },
   });
   if (!row) return null;
@@ -61,7 +74,10 @@ export async function getPublicOffering(
     gradeMax: row.course.gradeMax,
     level: row.course.level as PublicOffering["level"],
     priceWon: row.priceWon,
-    availableSeats: Math.max(0, row.capacity - row._count.enrollments),
+    availableSeats: Math.max(
+      0,
+      row.capacity - row._count.enrollments - row._count.orders,
+    ),
     sessions: row.sessions.map((s) => ({
       id: s.id,
       startsAt: s.startsAt.toISOString(),

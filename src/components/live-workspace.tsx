@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import styles from "./live-workspace.module.css";
+import { ParentOrders } from "./commerce/orders";
+import { AcademyFinance, AdminPayments } from "./commerce/finance";
 
 type Role = "parent" | "student" | "owner" | "instructor" | "admin";
 type Result<T> =
@@ -573,13 +575,7 @@ export function LiveWorkspace({
                     </div>
                   )}
                   {section === "orders" ? (
-                    <Panel title="결제 내역">
-                      <p>
-                        현재 단계에서는 결제와 수강권을 제공하지 않습니다. 실제
-                        결제·환불 기능이 연결된 후 본인의 주문만 확인할 수
-                        있습니다.
-                      </p>
-                    </Panel>
+                    <ParentOrders />
                   ) : (
                     <>
                       <Panel title="연결된 자녀">
@@ -730,12 +726,10 @@ export function LiveWorkspace({
               )}
               {role === "owner" && (
                 <>
-                  {section === "finance" || section === "students" ? (
-                    <Panel
-                      title={
-                        section === "finance" ? "정산 내역" : "수강생 관리"
-                      }
-                    >
+                  {section === "finance" ? (
+                    <AcademyFinance memberships={me.memberships} />
+                  ) : section === "students" ? (
+                    <Panel title="수강생 관리">
                       <p>
                         결제·수강권 기능 연결 전입니다. 아직 실제
                         거래·정산·수강생 명단을 제공하지 않습니다.
@@ -1262,12 +1256,7 @@ export function LiveWorkspace({
                 (me.user.platformAdmin ? (
                   <>
                     {section === "payments" ? (
-                      <Panel title="거래 관리">
-                        <p>
-                          현재 단계에서는 결제·환불·정산을 실행하지 않습니다.
-                          다음 단계에서 실제 거래 상태와 예외 처리를 연결합니다.
-                        </p>
-                      </Panel>
+                      <AdminPayments />
                     ) : (
                       <>
                         <Panel title="학원 입점 심사">

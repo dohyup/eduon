@@ -25,6 +25,8 @@ const statuses: Record<ErrorCode, number> = {
   VALIDATION: 422,
   CONFLICT: 409,
   EXPIRED: 410,
+  SOLD_OUT: 409,
+  PROVIDER_UNAVAILABLE: 503,
   RATE_LIMITED: 429,
   UNAVAILABLE: 503,
 };
@@ -65,6 +67,32 @@ export async function readJson(request: Request) {
   } catch {
     throw new AppError("VALIDATION");
   }
+}
+/** Preserve exact signed bytes and bound streaming bodies before decoding. */
+export async function readRawBody(request: Request) {
+  ensure(
+    request.headers.get("content-type")?.split(";")[0] === "application/json",
+    "VALIDATION",
+  );
+  ensure(
+    Number(request.headers.get("content-length") || 0) <= 32768,
+    "VALIDATION",
+  );
+  const reader = request.body?.getReader();
+  ensure(reader, "VALIDATION");
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > 32768) {
+      await reader.cancel();
+      throw new AppError("VALIDATION");
+    }
+    chunks.push(value);
+  }
+  return new Uint8Array(Buffer.concat(chunks));
 }
 export async function handle(
   request: Request,

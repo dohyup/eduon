@@ -1,5 +1,7 @@
 # EDUON P3 Commerce Implementation Plan
 
+**진행 상태 (2026-11-09):** 사용자가 결제 공급자 선택을 보류해 내부 테스트 범위로 P3-01~04를 구현했다. 실제 PG sandbox·실결제·원격 P3 마이그레이션은 수행하지 않았다. 원래 체크리스트의 외부 검증 항목은 완료로 간주하지 않는다. 상세 증거와 경계는 [P3 검증 기록](../../operations/p3-qa.md), 서비스 추천·정책은 [거래 결정 기록](../../operations/commerce-decisions.md)을 따른다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 마지막 좌석 경합·결제 지연·환불 실패에도 일관된 수강권을 제공한다.
@@ -21,18 +23,22 @@
 - [ ] 아래를 작성하고 `npm run test:integration -- tests/integration/reservations.test.ts` RED 확인. 두 보호자는 서로 다른 학생에게 확인된 연결이 있다.
 
 ```ts
-it('마지막 한 자리는 한 주문만 확보한다', async () => {
+it("마지막 한 자리는 한 주문만 확보한다", async () => {
   const x = await seedScenario(db, { capacity: 1 });
   const results = await Promise.all([
     createOrder(makeContext(db, x.parent), {
-      studentId: x.studentId, offeringId: x.offeringId, requestKey: 'r1',
+      studentId: x.studentId,
+      offeringId: x.offeringId,
+      requestKey: "r1",
     }),
     createOrder(makeContext(db, x.otherParent), {
-      studentId: x.otherStudentId, offeringId: x.offeringId, requestKey: 'r2',
+      studentId: x.otherStudentId,
+      offeringId: x.offeringId,
+      requestKey: "r2",
     }),
   ]);
-  expect(results.filter(r => r.ok)).toHaveLength(1);
-  expect(results.filter(r => !r.ok && r.code === 'SOLD_OUT')).toHaveLength(1);
+  expect(results.filter((r) => r.ok)).toHaveLength(1);
+  expect(results.filter((r) => !r.ok && r.code === "SOLD_OUT")).toHaveLength(1);
 });
 ```
 
@@ -48,17 +54,31 @@ it('마지막 한 자리는 한 주문만 확보한다', async () => {
 
 ```ts
 type VerifiedPayment = {
-  transactionId: string; orderId: string; amountWon: number;
-  currency: 'KRW'; status: 'paid' | 'pending' | 'failed';
+  transactionId: string;
+  orderId: string;
+  amountWon: number;
+  currency: "KRW";
+  status: "paid" | "pending" | "failed";
 };
 interface PaymentPort {
-  prepare(input: { orderId: string; amountWon: number; requestKey: string })
-    : Promise<{ checkoutUrl: string }>;
-  verifyWebhook(rawBody: Uint8Array, headers: Headers)
-    : Promise<{ eventId: string; transactionId: string }>;
+  prepare(input: {
+    orderId: string;
+    amountWon: number;
+    requestKey: string;
+  }): Promise<{ checkoutUrl: string }>;
+  verifyWebhook(
+    rawBody: Uint8Array,
+    headers: Headers,
+  ): Promise<{ eventId: string; transactionId: string }>;
   fetchPayment(transactionId: string): Promise<VerifiedPayment>;
-  refund(input: { transactionId: string; amountWon: number; requestKey: string })
-    : Promise<{ reference: string; status: 'succeeded' | 'pending' | 'failed' }>;
+  refund(input: {
+    transactionId: string;
+    amountWon: number;
+    requestKey: string;
+  }): Promise<{
+    reference: string;
+    status: "succeeded" | "pending" | "failed";
+  }>;
 }
 // applyVerifiedPayment(ctx, payment: VerifiedPayment): Promise<Outcome<void>>
 // ingestPaymentEvent(rawBody, headers, port: PaymentPort): Promise<{ accepted: boolean }>
@@ -70,19 +90,26 @@ interface PaymentPort {
 - [ ] 아래 RED를 `npm run test:integration -- tests/integration/payment-events.test.ts`로 확인한다. `systemContext(db)`는 tests/support/context.ts에 생성자를 추가한다.
 
 ```ts
-it('동일 결제 확인은 수강권을 중복 생성하지 않는다', async () => {
+it("동일 결제 확인은 수강권을 중복 생성하지 않는다", async () => {
   const order = await createOrder(ctx, {
-    studentId: s.studentId, offeringId: s.offeringId, requestKey: 'pay-1',
+    studentId: s.studentId,
+    offeringId: s.offeringId,
+    requestKey: "pay-1",
   });
   if (!order.ok) throw new Error(order.code);
   const payment: VerifiedPayment = {
-    transactionId: 'tx-1', orderId: order.value.orderId,
-    amountWon: order.value.amountWon, currency: 'KRW', status: 'paid',
+    transactionId: "tx-1",
+    orderId: order.value.orderId,
+    amountWon: order.value.amountWon,
+    currency: "KRW",
+    status: "paid",
   };
   const sys = systemContext(db);
   await applyVerifiedPayment(sys, payment);
   await applyVerifiedPayment(sys, payment);
-  expect(await db.enrollment.count({ where: { orderId: order.value.orderId } })).toBe(1);
+  expect(
+    await db.enrollment.count({ where: { orderId: order.value.orderId } }),
+  ).toBe(1);
 });
 ```
 
@@ -99,16 +126,21 @@ it('동일 결제 확인은 수강권을 중복 생성하지 않는다', async (
 - [ ] 아래 RED와 만료-결제 확인 경합 테스트를 작성한다. `getEnrollmentForOrder(sys, orderId): Promise<{ status: string } | null>`을 enrollment/orders.ts에 추가한다.
 
 ```ts
-it('만료된 예약의 지연 성공은 활성 수강권을 만들지 않는다', async () => {
+it("만료된 예약의 지연 성공은 활성 수강권을 만들지 않는다", async () => {
   const created = await createOrder(ctx, {
-    studentId: s.studentId, offeringId: s.offeringId, requestKey: 'late',
+    studentId: s.studentId,
+    offeringId: s.offeringId,
+    requestKey: "late",
   });
   if (!created.ok) throw new Error(created.code);
-  const sys = systemContext(db, new Date('2029-12-31T00:11:00Z'));
+  const sys = systemContext(db, new Date("2029-12-31T00:11:00Z"));
   await expireReservations(sys);
   await applyVerifiedPayment(sys, {
-    transactionId: 'late-tx', orderId: created.value.orderId,
-    amountWon: created.value.amountWon, currency: 'KRW', status: 'paid',
+    transactionId: "late-tx",
+    orderId: created.value.orderId,
+    amountWon: created.value.amountWon,
+    currency: "KRW",
+    status: "paid",
   });
   expect(await getEnrollmentForOrder(sys, created.value.orderId)).toBeNull();
 });
@@ -128,19 +160,23 @@ it('만료된 예약의 지연 성공은 활성 수강권을 만들지 않는다
 - [ ] 테스트 지원에 `payOrder(sys, orderId): Promise<void>`를 만든다. 이 함수는 주문 서버금액을 조회하고 `applyVerifiedPayment`를 호출한다. 아래 RED를 `npm run test:integration -- tests/integration/refunds.test.ts`로 확인한다.
 
 ```ts
-it('환불 요청만으로 환불 완료를 표시하지 않는다', async () => {
+it("환불 요청만으로 환불 완료를 표시하지 않는다", async () => {
   const created = await createOrder(ctx, {
-    studentId: s.studentId, offeringId: s.offeringId, requestKey: 'refund',
+    studentId: s.studentId,
+    offeringId: s.offeringId,
+    requestKey: "refund",
   });
   if (!created.ok) throw new Error(created.code);
   await payOrder(systemContext(db), created.value.orderId);
   const requested = await requestRefund(ctx, {
-    orderId: created.value.orderId, cancelSessionIds: [s.sessionId],
-    reason: '일정 변경', requestKey: 'refund-1',
+    orderId: created.value.orderId,
+    cancelSessionIds: [s.sessionId],
+    reason: "일정 변경",
+    requestKey: "refund-1",
   });
   expect(requested.ok).toBe(true);
   const order = await getOrder(ctx, created.value.orderId);
-  expect(order.ok && order.value.status).toBe('paid');
+  expect(order.ok && order.value.status).toBe("paid");
 });
 ```
 

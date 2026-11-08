@@ -20,9 +20,12 @@ model User {
   assignments           InstructorAssignment[]
   studentInvitations    StudentInvitation[]
   instructorInvitations InstructorInvitation[]
+  orders                Order[]
 }
 
 model Academy {
+  orders                Order[]
+  settlementEntries     SettlementEntry[]
   id                    String                 @id @default(uuid()) @db.Uuid
   name                  String
   region                String
@@ -51,6 +54,7 @@ model AcademyMembership {
 }
 
 model StudentProfile {
+  orders        Order[]
   id            String              @id @default(uuid()) @db.Uuid
   name          String
   grade         Int
@@ -122,6 +126,7 @@ model Course {
 }
 
 model Offering {
+  orders             Order[]
   id                 String                 @id @default(uuid()) @db.Uuid
   courseId           String                 @db.Uuid
   academyId          String                 @db.Uuid
@@ -145,12 +150,13 @@ model Offering {
 }
 
 model Session {
-  id         String   @id @default(uuid()) @db.Uuid
-  offeringId String   @db.Uuid
-  academyId  String   @db.Uuid
-  startsAt   DateTime
-  endsAt     DateTime
-  offering   Offering @relation(fields: [offeringId, academyId], references: [id, academyId], onDelete: Restrict)
+  enrollmentSessions EnrollmentSession[]
+  id                 String              @id @default(uuid()) @db.Uuid
+  offeringId         String              @db.Uuid
+  academyId          String              @db.Uuid
+  startsAt           DateTime
+  endsAt             DateTime
+  offering           Offering            @relation(fields: [offeringId, academyId], references: [id, academyId], onDelete: Restrict)
 
   @@index([offeringId, academyId])
   @@index([startsAt, endsAt])
@@ -168,12 +174,15 @@ model InstructorAssignment {
 }
 
 model Enrollment {
-  id         String         @id @default(uuid()) @db.Uuid
-  offeringId String         @db.Uuid
-  studentId  String         @db.Uuid
-  status     String         @default("active")
-  offering   Offering       @relation(fields: [offeringId], references: [id], onDelete: Restrict)
-  student    StudentProfile @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  orderId    String?             @unique @db.Uuid
+  order      Order?              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  sessions   EnrollmentSession[]
+  id         String              @id @default(uuid()) @db.Uuid
+  offeringId String              @db.Uuid
+  studentId  String              @db.Uuid
+  status     String              @default("active")
+  offering   Offering            @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  student    StudentProfile      @relation(fields: [studentId], references: [id], onDelete: Restrict)
 
   @@unique([offeringId, studentId])
   @@index([studentId, status])
@@ -204,4 +213,194 @@ model RecommendationEvent {
   createdAt    DateTime @default(now())
 
   @@index([actorId, createdAt])
+}
+
+model Order {
+  id                String            @id @default(uuid()) @db.Uuid
+  parentId          String            @db.Uuid
+  studentId         String            @db.Uuid
+  offeringId        String            @db.Uuid
+  academyId         String            @db.Uuid
+  requestKey        String
+  status            String            @default("pending_payment")
+  amountWon         Int
+  currency          String            @default("KRW")
+  feeWon            Int
+  policyVersion     String
+  policySnapshot    Json
+  sessionsSnapshot  Json
+  consentedAt       DateTime?
+  expiresAt         DateTime
+  exceptionReason   String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  parent            User              @relation(fields: [parentId], references: [id], onDelete: Restrict)
+  student           StudentProfile    @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  offering          Offering          @relation(fields: [offeringId, academyId], references: [id, academyId], onDelete: Restrict)
+  academy           Academy           @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  reservation       SeatReservation?
+  enrollment        Enrollment?
+  payment           Payment?
+  refunds           Refund[]
+  settlementEntries SettlementEntry[]
+
+  @@unique([parentId, requestKey])
+  @@unique([id, studentId, offeringId, academyId])
+  @@index([parentId, createdAt, id])
+  @@index([studentId, status])
+  @@index([offeringId, academyId, status])
+  @@index([status, expiresAt])
+  @@index([academyId, status])
+}
+
+model SeatReservation {
+  id         String   @id @default(uuid()) @db.Uuid
+  orderId    String   @unique @db.Uuid
+  studentId  String   @db.Uuid
+  offeringId String   @db.Uuid
+  academyId  String   @db.Uuid
+  status     String   @default("held")
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  order      Order    @relation(fields: [orderId, studentId, offeringId, academyId], references: [id, studentId, offeringId, academyId], onDelete: Restrict)
+
+  @@unique([orderId, studentId, offeringId, academyId])
+  @@index([offeringId, status, expiresAt])
+  @@index([studentId, status, expiresAt])
+}
+
+model EnrollmentSession {
+  id           String          @id @default(uuid()) @db.Uuid
+  enrollmentId String          @db.Uuid
+  sessionId    String          @db.Uuid
+  status       String          @default("allowed")
+  startsAt     DateTime
+  endsAt       DateTime
+  amountWon    Int
+  completedAt  DateTime?
+  enrollment   Enrollment      @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  session      Session         @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  refunds      RefundSession[]
+
+  @@unique([enrollmentId, sessionId])
+  @@index([sessionId])
+}
+
+model Payment {
+  id                String            @id @default(uuid()) @db.Uuid
+  orderId           String            @unique @db.Uuid
+  provider          String            @default("fake")
+  transactionId     String            @unique
+  amountWon         Int
+  currency          String            @default("KRW")
+  status            String            @default("pending")
+  verifiedAt        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  order             Order             @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  refunds           Refund[]
+  settlementEntries SettlementEntry[]
+
+  @@index([status, updatedAt])
+}
+
+model Refund {
+  id                String            @id @default(uuid()) @db.Uuid
+  orderId           String            @db.Uuid
+  paymentId         String            @db.Uuid
+  requestKey        String            @unique
+  requestedById     String?           @db.Uuid
+  kind              String            @default("customer")
+  status            String            @default("requested")
+  amountWon         Int
+  reason            String
+  providerReference String?
+  attempts          Int               @default(0)
+  lastError         String?
+  succeededAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  order             Order             @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  payment           Payment           @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  sessions          RefundSession[]
+  settlementEntries SettlementEntry[]
+
+  @@index([orderId, status])
+  @@index([paymentId, status])
+  @@index([status, updatedAt])
+}
+
+model RefundSession {
+  id                  String            @id @default(uuid()) @db.Uuid
+  refundId            String            @db.Uuid
+  enrollmentSessionId String            @db.Uuid
+  refund              Refund            @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  enrollmentSession   EnrollmentSession @relation(fields: [enrollmentSessionId], references: [id], onDelete: Restrict)
+
+  @@unique([refundId, enrollmentSessionId])
+  @@index([enrollmentSessionId])
+}
+
+model ProviderEvent {
+  id            String    @id @default(uuid()) @db.Uuid
+  provider      String    @default("fake")
+  eventId       String    @unique
+  transactionId String
+  status        String    @default("pending")
+  payloadJson   Json
+  attempts      Int       @default(0)
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  processedAt   DateTime?
+
+  @@index([status, createdAt])
+  @@index([transactionId])
+}
+
+model SettlementEntry {
+  id                String            @id @default(uuid()) @db.Uuid
+  academyId         String            @db.Uuid
+  orderId           String            @db.Uuid
+  paymentId         String?           @db.Uuid
+  refundId          String?           @db.Uuid
+  kind              String
+  amountWon         Int
+  currency          String            @default("KRW")
+  idempotencyKey    String            @unique
+  originalEntryId   String?           @db.Uuid
+  externalReference String?
+  recordedById      String?           @db.Uuid
+  createdAt         DateTime          @default(now())
+  academy           Academy           @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  order             Order             @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  payment           Payment?          @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  refund            Refund?           @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  originalEntry     SettlementEntry?  @relation("LedgerOriginal", fields: [originalEntryId], references: [id], onDelete: Restrict)
+  adjustments       SettlementEntry[] @relation("LedgerOriginal")
+
+  @@index([academyId, createdAt, id])
+  @@index([orderId])
+  @@index([paymentId])
+  @@index([refundId])
+  @@index([originalEntryId])
+}
+
+model Job {
+  id          String    @id @default(uuid()) @db.Uuid
+  type        String
+  status      String    @default("pending")
+  dedupeKey   String    @unique
+  payloadJson Json
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  runAt       DateTime  @default(now())
+  leaseUntil  DateTime?
+  claimedBy   String?
+  claimToken  String?   @db.Uuid
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, runAt])
+  @@index([status, leaseUntil])
 }

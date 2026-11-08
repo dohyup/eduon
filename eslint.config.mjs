@@ -7,12 +7,14 @@ export default defineConfig([
   globalIgnores([
     ".next/**",
     ".next-p2/**",
+    ".next-p3/**",
     ".next-p1/**",
     ".tmp/**",
     "src/generated/**",
     "playwright-report/**",
     "test-results/**",
     "test-results-p2/**",
+    "test-results-p3/**",
     "next-env.d.ts",
   ]),
 ]);

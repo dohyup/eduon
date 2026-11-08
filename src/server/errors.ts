@@ -6,6 +6,8 @@ export type ErrorCode =
   | "VALIDATION"
   | "CONFLICT"
   | "EXPIRED"
+  | "SOLD_OUT"
+  | "PROVIDER_UNAVAILABLE"
   | "RATE_LIMITED"
   | "UNAVAILABLE";
 export type Outcome<T> =

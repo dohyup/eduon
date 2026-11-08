@@ -1,6 +1,8 @@
 import { config } from "dotenv";
-config({ path: ".env.local", quiet: true });
-config({ path: ".env", quiet: true });
+if (process.env.NODE_ENV !== "test") {
+  config({ path: ".env.local", quiet: true });
+  config({ path: ".env", quiet: true });
+}
 import { defineConfig } from "prisma/config";
 export default defineConfig({
   schema: "prisma/schema.prisma",

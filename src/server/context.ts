@@ -5,3 +5,8 @@ export type ServiceContext = {
   db: PrismaClient;
   now: () => Date;
 };
+export type SystemContext = {
+  db: PrismaClient;
+  now: () => Date;
+  source: "webhook" | "job";
+};

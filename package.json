@@ -14,6 +14,7 @@
     "test:integration": "node scripts/test-integration.mjs",
     "db:migrate": "prisma migrate deploy",
     "test:e2e:p2": "tsx scripts/test-p2.mts",
+    "test:e2e:p3": "tsx scripts/test-p3.mts",
     "config:check": "tsx scripts/check-config.mts",
     "admin:bootstrap": "tsx scripts/bootstrap-admin.mts",
     "db:migrate:test": "node scripts/test-integration.mjs --migration-only"

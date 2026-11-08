@@ -152,12 +152,30 @@ export function updateOffering(
     return ctx.db.$transaction(async (tx) => {
       await lockAcademy(tx, data.academyId);
       await requireAcademyOwner(tx, ctx.actor.userId, data.academyId);
+      await tx.$executeRaw`SELECT set_config('eduon.now', ${ctx.now().toISOString()}, true)`;
+      await tx.offering.update({
+        where: { id: offeringId },
+        data: { capacity: { increment: 0 } },
+      });
       const current = await tx.offering.findUnique({
         where: { id: offeringId },
         include: {
           sessions: true,
           instructors: true,
-          _count: { select: { enrollments: { where: { status: "active" } } } },
+          _count: {
+            select: {
+              enrollments: {
+                where: { status: { in: ["active", "pending_payment"] } },
+              },
+              orders: {
+                where: {
+                  status: "pending_payment",
+                  expiresAt: { gt: ctx.now() },
+                  reservation: { is: { status: "held" } },
+                },
+              },
+            },
+          },
         },
       });
       ensure(current && current.academyId === data.academyId, "FORBIDDEN");
@@ -182,7 +200,10 @@ export function updateOffering(
           "CONFLICT",
         );
       }
-      ensure(data.capacity >= current._count.enrollments, "CONFLICT");
+      ensure(
+        data.capacity >= current._count.enrollments + current._count.orders,
+        "CONFLICT",
+      );
       await verifyInstructors(tx, data.academyId, data.instructorIds);
       // A fresh course revision avoids changing another cohort sharing this course.
       const course = await tx.course.create({ data: courseData(data) });
