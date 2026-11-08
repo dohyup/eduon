@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  email                 String                 @unique
+  platformAdmin         Boolean                @default(false)
+  guardianVerifiedAt    DateTime?
+  disabledAt            DateTime?
+  createdAt             DateTime               @default(now())
+  memberships           AcademyMembership[]
+  guardianLinks         GuardianLink[]
+  student               StudentProfile?
+  assignments           InstructorAssignment[]
+  studentInvitations    StudentInvitation[]
+  instructorInvitations InstructorInvitation[]
+}
+
+model Academy {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  name                  String
+  region                String
+  status                String                 @default("draft")
+  decisionReason        String?
+  createdAt             DateTime               @default(now())
+  memberships           AcademyMembership[]
+  courses               Course[]
+  offerings             Offering[]
+  instructorInvitations InstructorInvitation[]
+
+  @@index([status, createdAt])
+}
+
+model AcademyMembership {
+  id        String  @id @default(uuid()) @db.Uuid
+  academyId String  @db.Uuid
+  userId    String  @db.Uuid
+  role      String
+  active    Boolean @default(true)
+  academy   Academy @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([academyId, userId])
+  @@index([userId, active])
+}
+
+model StudentProfile {
+  id            String              @id @default(uuid()) @db.Uuid
+  name          String
+  grade         Int
+  accountUserId String?             @unique @db.Uuid
+  account       User?               @relation(fields: [accountUserId], references: [id], onDelete: Restrict)
+  guardians     GuardianLink[]
+  invitations   StudentInvitation[]
+  enrollments   Enrollment[]
+  createdAt     DateTime            @default(now())
+}
+
+model GuardianLink {
+  id         String         @id @default(uuid()) @db.Uuid
+  guardianId String         @db.Uuid
+  studentId  String         @db.Uuid
+  verifiedAt DateTime
+  revokedAt  DateTime?
+  guardian   User           @relation(fields: [guardianId], references: [id], onDelete: Restrict)
+  student    StudentProfile @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([guardianId, studentId])
+  @@index([studentId, revokedAt])
+}
+
+model StudentInvitation {
+  id             String         @id @default(uuid()) @db.Uuid
+  studentId      String         @db.Uuid
+  issuedById     String         @db.Uuid
+  recipientEmail String
+  tokenHash      String         @unique
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  revokedAt      DateTime?
+  student        StudentProfile @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  issuer         User           @relation(fields: [issuedById], references: [id], onDelete: Restrict)
+
+  @@index([studentId, expiresAt])
+  @@index([issuedById])
+}
+
+model InstructorInvitation {
+  issuedById     String    @db.Uuid
+  issuer         User      @relation(fields: [issuedById], references: [id], onDelete: Restrict)
+  id             String    @id @default(uuid()) @db.Uuid
+  academyId      String    @db.Uuid
+  recipientEmail String
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  revokedAt      DateTime?
+  academy        Academy   @relation(fields: [academyId], references: [id], onDelete: Restrict)
+
+  @@index([academyId, expiresAt])
+}
+
+model Course {
+  id        String     @id @default(uuid()) @db.Uuid
+  academyId String     @db.Uuid
+  title     String
+  subject   String
+  gradeMin  Int
+  gradeMax  Int
+  level     String
+  academy   Academy    @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  offerings Offering[]
+
+  @@unique([id, academyId])
+  @@index([academyId])
+}
+
+model Offering {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  courseId           String                 @db.Uuid
+  academyId          String                 @db.Uuid
+  status             String                 @default("draft")
+  priceWon           Int
+  capacity           Int
+  enrollmentOpensAt  DateTime
+  enrollmentClosesAt DateTime
+  purchaseLockedAt   DateTime?
+  createdAt          DateTime               @default(now())
+  course             Course                 @relation(fields: [courseId, academyId], references: [id, academyId], onDelete: Restrict)
+  academy            Academy                @relation(fields: [academyId], references: [id], onDelete: Restrict)
+  sessions           Session[]
+  instructors        InstructorAssignment[]
+  enrollments        Enrollment[]
+
+  @@unique([id, academyId])
+  @@index([academyId, status])
+  @@index([status, enrollmentClosesAt, id])
+  @@index([courseId, academyId])
+}
+
+model Session {
+  id         String   @id @default(uuid()) @db.Uuid
+  offeringId String   @db.Uuid
+  academyId  String   @db.Uuid
+  startsAt   DateTime
+  endsAt     DateTime
+  offering   Offering @relation(fields: [offeringId, academyId], references: [id, academyId], onDelete: Restrict)
+
+  @@index([offeringId, academyId])
+  @@index([startsAt, endsAt])
+}
+
+model InstructorAssignment {
+  id         String   @id @default(uuid()) @db.Uuid
+  offeringId String   @db.Uuid
+  userId     String   @db.Uuid
+  offering   Offering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  instructor User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([offeringId, userId])
+  @@index([userId])
+}
+
+model Enrollment {
+  id         String         @id @default(uuid()) @db.Uuid
+  offeringId String         @db.Uuid
+  studentId  String         @db.Uuid
+  status     String         @default("active")
+  offering   Offering       @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  student    StudentProfile @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([offeringId, studentId])
+  @@index([studentId, status])
+}
+
+model AuditEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String   @db.Uuid
+  action    String
+  targetId  String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([targetId, createdAt])
+}
+
+model RateLimit {
+  key       String   @id
+  hits      Int
+  expiresAt DateTime
+}
+
+model RecommendationEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  actorId      String   @db.Uuid
+  ruleVersion  String
+  candidateIds String[]
+  createdAt    DateTime @default(now())
+
+  @@index([actorId, createdAt])
+}
