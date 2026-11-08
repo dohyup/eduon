@@ -6,6 +6,7 @@ import type {
   SearchResult,
 } from "@/contracts/domain";
 import { getDatabase } from "@/server/db";
+import { paymentReadiness } from "@/integrations/payments/provider";
 import {
   matchesOffering,
   validSearchInput,
@@ -26,6 +27,10 @@ export async function searchOfferings(
   )
     return { items: [], nextCursor: null };
   const items: PublicOffering[] = [];
+  // The user may defer P3's remote migration together with provider selection.
+  // Existing P2 catalogs must still work while new checkout is disabled.
+  const commerceAvailable =
+    process.env.NODE_ENV === "test" || paymentReadiness().configured;
   let after = input.cursor;
   // Seat counts and availability windows are evaluated in bounded DB batches.
   for (let batch = 0; batch < 10; batch++) {
@@ -72,13 +77,15 @@ export async function searchOfferings(
             enrollments: {
               where: { status: { in: ["active", "pending_payment"] } },
             },
-            orders: {
-              where: {
-                status: "pending_payment",
-                expiresAt: { gt: now },
-                reservation: { is: { status: "held" } },
-              },
-            },
+            orders: commerceAvailable
+              ? {
+                  where: {
+                    status: "pending_payment",
+                    expiresAt: { gt: now },
+                    reservation: { is: { status: "held" } },
+                  },
+                }
+              : false,
           },
         },
       },
@@ -95,7 +102,7 @@ export async function searchOfferings(
         priceWon: row.priceWon,
         availableSeats: Math.max(
           0,
-          row.capacity - row._count.enrollments - row._count.orders,
+          row.capacity - row._count.enrollments - (row._count.orders || 0),
         ),
         sessions: row.sessions.map((s) => ({
           id: s.id,

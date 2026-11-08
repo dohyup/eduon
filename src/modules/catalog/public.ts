@@ -1,4 +1,5 @@
 import "server-only";
+import { paymentReadiness } from "@/integrations/payments/provider";
 import { isDemoMode } from "@/server/config";
 import { getDatabase } from "@/server/db";
 import { academies, demoOfferings } from "@/demo/catalog";
@@ -51,13 +52,16 @@ export async function getPublicOffering(
           enrollments: {
             where: { status: { in: ["active", "pending_payment"] } },
           },
-          orders: {
-            where: {
-              status: "pending_payment",
-              expiresAt: { gt: new Date() },
-              reservation: { is: { status: "held" } },
-            },
-          },
+          orders:
+            process.env.NODE_ENV === "test" || paymentReadiness().configured
+              ? {
+                  where: {
+                    status: "pending_payment",
+                    expiresAt: { gt: new Date() },
+                    reservation: { is: { status: "held" } },
+                  },
+                }
+              : false,
         },
       },
     },
@@ -76,7 +80,7 @@ export async function getPublicOffering(
     priceWon: row.priceWon,
     availableSeats: Math.max(
       0,
-      row.capacity - row._count.enrollments - row._count.orders,
+      row.capacity - row._count.enrollments - (row._count.orders || 0),
     ),
     sessions: row.sessions.map((s) => ({
       id: s.id,

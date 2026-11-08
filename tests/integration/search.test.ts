@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestDatabase } from "../support/database";
 import { seedScenario } from "../support/scenario";
 import { makeContext } from "../support/context";
@@ -22,7 +22,20 @@ describe("DB 공개 검색과 추천", () => {
     });
   });
   afterEach(async () => {
+    vi.unstubAllEnvs();
     await store?.close();
+  });
+  it("PG 미선택 환경은 P3 테이블 적용 전에도 P2 공개 검색을 유지한다", async () => {
+    const schema = new URL(store.url).searchParams.get("schema")!;
+    expect(schema).toMatch(/^test_[0-9a-f]{32}$/);
+    await store.db.$executeRawUnsafe(
+      `ALTER TABLE "${schema}"."Order" RENAME TO "Order_not_deployed"`,
+    );
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("PAYMENT_PROVIDER", "");
+    const result = await searchOfferings({}, store.db, now);
+    expect(result.items.map((o) => o.id)).toEqual([s.offeringId]);
+    expect(result.items[0].availableSeats).toBe(2);
   });
   it("공개 승인 모집 기간과 잔여 정원을 모두 검사한다", async () => {
     expect(
