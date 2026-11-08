@@ -21,6 +21,8 @@
 
 값이 채워졌는지만 확인한다. 이 명령은 값 자체를 출력하지 않는다.
 
+연결 문자열은 따옴표로 감싼다. DB 비밀번호에 `#`, `@` 같은 문자가 있으면 비밀번호 부분을 URI 인코딩한다. 특히 따옴표 없는 `#`은 환경파일에서 주석으로 처리되어 연결 문자열이 잘린다.
+
 ```sh
 npm run config:check
 ```
@@ -48,6 +50,8 @@ npm run db:migrate
 ```
 
 Prisma 명령은 `.env.local`을 자동 읽는 Next 서버와 다르므로 config가 해당 파일을 로드하도록 구성되어 있다. 운영 URL에 테스트 명령을 사용하지 않는다. 테스트 러너는 별도 `eduon_test` DB와 무작위 스키마를 사용한다.
+
+실제 연결에서는 Supabase CA를 구성해 인증서를 검증한다. 런타임 `pg`는 `sslmode=verify-full&sslrootcert=인증서경로`, Prisma 마이그레이션은 별도 `MIGRATION_DATABASE_URL`의 `sslmode=require&sslcert=인증서경로&sslrootcert=인증서경로&sslaccept=strict`를 사용한다. 경로는 URL 쿼리 값으로 인코딩하고, 다른 머신에는 그 머신의 경로를 사용한다. `rejectUnauthorized: false`나 `sslaccept=accept_invalid_certs`로 우회하지 않는다. 현재 프로젝트의 적용 결과는 [실제 Supabase 검증 기록](p2-supabase-verification.md)에 남겼다.
 
 ## 4. 서버 전용 DB 권한과 RLS
 
