@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { MAX_GRADE } from "@/contracts/catalog";
 import { z } from "zod";
 import type { ServiceContext } from "@/server/context";
 import { attempt, ensure } from "@/server/errors";
@@ -15,7 +16,7 @@ export function createChild(
     const child = z
       .object({
         name: z.string().trim().min(1).max(60),
-        grade: z.number().int().min(1).max(12),
+        grade: z.number().int().min(1).max(MAX_GRADE),
       })
       .strict()
       .parse(input);

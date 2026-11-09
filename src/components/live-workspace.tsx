@@ -5,6 +5,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import styles from "./live-workspace.module.css";
+import {
+  SUBJECTS,
+  subjectLabels,
+  MAX_GRADE,
+  gradeText,
+  gradeRangeLabel,
+} from "@/contracts/catalog";
 import { ParentOrders } from "./commerce/orders";
 import { AcademyFinance, AdminPayments } from "./commerce/finance";
 import { LearningHome, ParentLearning } from "./learning/home";
@@ -139,12 +146,6 @@ const statusText: Record<string, string> = {
   completed: "완료",
   cancelled: "취소",
 };
-const gradeText = (grade: number) =>
-  grade <= 6
-    ? `초등 ${grade}학년`
-    : grade <= 9
-      ? `중등 ${grade - 6}학년`
-      : `고등 ${grade - 9}학년`;
 async function api<T>(
   url: string,
   body?: unknown,
@@ -706,11 +707,14 @@ export function LiveWorkspace({
                               <label>
                                 자녀 학년
                                 <select name="grade" defaultValue="5">
-                                  {Array.from({ length: 12 }, (_, index) => (
-                                    <option key={index + 1} value={index + 1}>
-                                      {gradeText(index + 1)}
-                                    </option>
-                                  ))}
+                                  {Array.from(
+                                    { length: MAX_GRADE },
+                                    (_, index) => (
+                                      <option key={index + 1} value={index + 1}>
+                                        {gradeText(index + 1)}
+                                      </option>
+                                    ),
+                                  )}
                                 </select>
                               </label>
                             </div>
@@ -1092,8 +1096,11 @@ export function LiveWorkspace({
                                 <label>
                                   과목
                                   <select name="subject">
-                                    <option value="math">수학</option>
-                                    <option value="english">영어</option>
+                                    {SUBJECTS.map((subject) => (
+                                      <option key={subject} value={subject}>
+                                        {subjectLabels[subject]}
+                                      </option>
+                                    ))}
                                   </select>
                                 </label>
                                 <label>
@@ -1109,21 +1116,33 @@ export function LiveWorkspace({
                                 <label>
                                   최소 학년
                                   <select name="gradeMin" defaultValue="4">
-                                    {Array.from({ length: 12 }, (_, index) => (
-                                      <option key={index + 1} value={index + 1}>
-                                        {gradeText(index + 1)}
-                                      </option>
-                                    ))}
+                                    {Array.from(
+                                      { length: MAX_GRADE },
+                                      (_, index) => (
+                                        <option
+                                          key={index + 1}
+                                          value={index + 1}
+                                        >
+                                          {gradeText(index + 1)}
+                                        </option>
+                                      ),
+                                    )}
                                   </select>
                                 </label>
                                 <label>
                                   최대 학년
                                   <select name="gradeMax" defaultValue="6">
-                                    {Array.from({ length: 12 }, (_, index) => (
-                                      <option key={index + 1} value={index + 1}>
-                                        {gradeText(index + 1)}
-                                      </option>
-                                    ))}
+                                    {Array.from(
+                                      { length: MAX_GRADE },
+                                      (_, index) => (
+                                        <option
+                                          key={index + 1}
+                                          value={index + 1}
+                                        >
+                                          {gradeText(index + 1)}
+                                        </option>
+                                      ),
+                                    )}
                                   </select>
                                 </label>
                                 <label>
@@ -1225,8 +1244,10 @@ export function LiveWorkspace({
                               </span>
                             </div>
                             <p>
-                              {gradeText(offering.course.gradeMin)} ~{" "}
-                              {gradeText(offering.course.gradeMax)}
+                              {gradeRangeLabel(
+                                offering.course.gradeMin,
+                                offering.course.gradeMax,
+                              )}
                             </p>
                             {offering.sessions.map((session, index) => (
                               <p className={styles.note} key={session.startsAt}>

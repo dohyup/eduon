@@ -15,9 +15,9 @@ describe("합성 수업 검색", () => {
       ).toBe(true);
     }
   });
-  it("초기 공급은 가상 학원 2곳의 수업 6개다", () => {
-    expect(demoOfferings).toHaveLength(6);
-    expect(new Set(demoOfferings.map((item) => item.academyId)).size).toBe(2);
+  it("확장된 데모는 가상 학원 3곳의 수업 10개다", () => {
+    expect(demoOfferings).toHaveLength(10);
+    expect(new Set(demoOfferings.map((item) => item.academyId)).size).toBe(3);
     expect(searchDemoOfferings({}).items).toEqual(demoOfferings);
   });
 
@@ -55,7 +55,7 @@ describe("합성 수업 검색", () => {
     ).toBe(true);
   });
 
-  it.each([0, 13, -1, 1.5, Number.NaN])(
+  it.each([0, 14, -1, 1.5, Number.NaN])(
     "잘못된 학년 %s는 결과를 만들지 않는다",
     (grade) => {
       expect(searchDemoOfferings({ grade }).items).toEqual([]);

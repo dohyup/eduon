@@ -12,6 +12,7 @@ import {
 import { OfferingCard } from "@/components/catalog/offering-card";
 import { listPublicOfferings } from "@/modules/catalog/public";
 import { isDemoMode } from "@/server/config";
+import { SUBJECTS, subjectLabels } from "@/contracts/catalog";
 export default async function Home() {
   const { items: demoOfferings } = await listPublicOfferings();
   return (
@@ -31,7 +32,7 @@ export default async function Home() {
             <p>
               동네 학원의 세심한 가르침을, 이제 어디서나.
               <br className="desktop-break" />
-              아이의 속도에 맞는 배움을 온라인으로 연결합니다.
+              학생부터 일반인까지, 나의 속도에 맞는 배움을 연결합니다.
             </p>
             <div className="hero-actions">
               <Link className="button" href="/classes">
@@ -145,9 +146,9 @@ export default async function Home() {
         <div className="section-heading">
           <div>
             <span className="eyebrow">FIND YOUR NEXT CLASS</span>
-            <h2>아이의 다음 배움을 찾아보세요</h2>
+            <h2>나의 다음 배움을 찾아보세요</h2>
             <p className="muted">
-              기초를 다지는 수학부터, 생각을 넓히는 영어까지.
+              수학·영어부터 프로그래밍, AI 활용·자격증·Agent 개발까지.
             </p>
           </div>
           <Link className="text-link" href="/classes">
@@ -155,6 +156,17 @@ export default async function Home() {
             <ArrowRight size={17} />
           </Link>
         </div>
+        <nav className="subject-links" aria-label="수업 분야">
+          {SUBJECTS.map((subject) => (
+            <Link
+              key={subject}
+              className="button small secondary"
+              href={`/classes?subject=${subject}`}
+            >
+              {subjectLabels[subject]}
+            </Link>
+          ))}
+        </nav>
         <div className="course-grid">
           {demoOfferings.slice(0, 3).map((o) => (
             <OfferingCard key={o.id} offering={o} />

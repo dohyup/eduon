@@ -1,4 +1,5 @@
 import type { PublicOffering, SearchInput } from "@/contracts/domain";
+import { SUBJECTS, MAX_GRADE } from "@/contracts/catalog";
 import { z } from "zod";
 
 const instant = z.iso.datetime({ offset: true });
@@ -13,14 +14,13 @@ export type Recommendation = {
 
 export function validSearchInput(input: SearchInput): boolean {
   return (
-    (input.subject === undefined ||
-      ["math", "english"].includes(input.subject)) &&
+    (input.subject === undefined || SUBJECTS.includes(input.subject)) &&
     (input.level === undefined ||
       ["beginner", "intermediate", "advanced"].includes(input.level)) &&
     (input.grade === undefined ||
       (Number.isInteger(input.grade) &&
         input.grade >= 1 &&
-        input.grade <= 12)) &&
+        input.grade <= MAX_GRADE)) &&
     (input.maxPriceWon === undefined ||
       (Number.isSafeInteger(input.maxPriceWon) && input.maxPriceWon >= 0)) &&
     (input.availableWindows === undefined ||

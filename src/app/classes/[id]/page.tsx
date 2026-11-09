@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Check, ArrowLeft, Video, Clock3, Users } from "lucide-react";
-import { gradeLabel, levelLabel, money, schedule } from "@/demo/catalog";
+import { levelLabel, money, schedule, demoCurricula } from "@/demo/catalog";
+import {
+  subjectLabels,
+  gradeRangeLabel,
+  GENERAL_GRADE,
+} from "@/contracts/catalog";
 import { getPublicOffering, getPublicAcademy } from "@/modules/catalog/public";
 import { isDemoMode } from "@/server/config";
 import { DemoDialog } from "@/components/ui/dialog";
@@ -30,14 +35,16 @@ export default async function Detail({
         <section>
           <div className="detail-intro">
             <span className="badge">
-              {o.subject === "math" ? "수학" : "영어"} ·{" "}
-              {gradeLabel(o.gradeMin)}–{gradeLabel(o.gradeMax)}
+              {subjectLabels[o.subject]} ·{" "}
+              {gradeRangeLabel(o.gradeMin, o.gradeMax)}
             </span>
             <h1>{o.title}</h1>
             <p className="muted">
-              정답을 넘어, 스스로 이해하고 설명하는 배움.
+              {o.gradeMin === GENERAL_GRADE
+                ? "일상과 업무에 연결하는 실습 중심의 배움."
+                : "정답을 넘어, 스스로 이해하고 설명하는 배움."}
               <br />
-              소그룹 안에서 아이의 질문에 귀 기울입니다.
+              소그룹 안에서 학습자의 질문에 귀 기울입니다.
             </p>
             <Link href={`/academies/${a.id}`} className="text-link">
               {a.name} · 학원 소개 보기 →
@@ -58,29 +65,31 @@ export default async function Detail({
             </span>
           </div>
           <div className="panel">
-            <h2>이런 아이에게 추천해요</h2>
+            <h2>이런 분께 추천해요</h2>
             <ul className="check-list">
               <li>
                 <Check size={18} />
-                {levelLabel[o.level]}부터 차근차근 배우고 싶은 학생
+                {levelLabel[o.level]}부터 차근차근 배우고 싶은 분
               </li>
               <li>
                 <Check size={18} />
-                모르는 부분을 편하게 질문하고 싶은 학생
+                모르는 부분을 편하게 질문하고 싶은 분
               </li>
               <li>
                 <Check size={18} />
-                자신의 생각을 설명하는 연습이 필요한 학생
+                자신의 생각을 설명하는 연습이 필요한 분
               </li>
             </ul>
           </div>
           <div className="panel">
             <h2>수업에서는 이렇게 배워요</h2>
-            {[
-              "지난 시간의 배움을 함께 돌아봐요",
-              "핵심 개념을 이해하고 직접 적용해요",
-              "나의 풀이와 생각을 말로 정리해요",
-            ].map((text, i) => (
+            {(
+              (demo && demoCurricula[o.subject]) || [
+                "지난 시간의 배움을 함께 돌아봐요",
+                "핵심 개념을 이해하고 직접 적용해요",
+                "나의 풀이와 생각을 말로 정리해요",
+              ]
+            ).map((text, i) => (
               <div className="curriculum" key={text}>
                 <span>0{i + 1}</span>
                 <div>
@@ -114,7 +123,7 @@ export default async function Detail({
             <div>
               <dt>대상</dt>
               <dd>
-                {gradeLabel(o.gradeMin)}–{gradeLabel(o.gradeMax)} ·{" "}
+                {gradeRangeLabel(o.gradeMin, o.gradeMax)} ·{" "}
                 {levelLabel[o.level]}
               </dd>
             </div>

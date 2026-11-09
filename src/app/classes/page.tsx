@@ -4,6 +4,7 @@ import { OfferingCard } from "@/components/catalog/offering-card";
 import { listPublicOfferings } from "@/modules/catalog/public";
 import { isDemoMode } from "@/server/config";
 import type { SearchInput } from "@/contracts/domain";
+import { SUBJECTS, MAX_GRADE } from "@/contracts/catalog";
 import { Search, ArrowUpRight } from "lucide-react";
 import { LearningDiscovery } from "@/components/learning/discovery";
 export const metadata = { title: "수업 찾기" };
@@ -17,13 +18,14 @@ export default async function Classes({
     Object.entries(raw).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v || ""]),
   );
   const invalid =
-    (values.subject && !["math", "english"].includes(values.subject)) ||
+    (values.subject &&
+      !SUBJECTS.includes(values.subject as SearchInput["subject"] & string)) ||
     (values.level &&
       !["beginner", "intermediate", "advanced"].includes(values.level)) ||
     (values.grade &&
       (!/^\d+$/.test(values.grade) ||
         Number(values.grade) < 1 ||
-        Number(values.grade) > 12)) ||
+        Number(values.grade) > MAX_GRADE)) ||
     (values.maxPriceWon &&
       (!/^\d+$/.test(values.maxPriceWon) ||
         !Number.isSafeInteger(Number(values.maxPriceWon))));
@@ -47,9 +49,10 @@ export default async function Classes({
       />
       <div className="page-heading">
         <span className="eyebrow">FIND YOUR CLASS</span>
-        <h1>아이의 속도에 맞는 배움</h1>
+        <h1>나의 속도에 맞는 배움</h1>
         <p className="muted">
-          과목과 수준, 일정을 살펴보고 우리 아이에게 맞는 수업을 찾아보세요.
+          학생부터 일반인까지, 수학·영어·프로그래밍·AI 수업을 수준과 일정에 맞게
+          찾아보세요.
         </p>
       </div>
       <div className="catalog-layout">
@@ -73,8 +76,8 @@ export default async function Classes({
           )}
           {invalid && (
             <p className="error-note" role="alert">
-              검색 조건을 확인해주세요. 학년은 1~12, 수강료는 0 이상의 정수로
-              입력하세요.
+              검색 조건을 확인해주세요. 학년 또는 일반인을 선택하고 수강료는 0
+              이상의 정수로 입력하세요.
             </p>
           )}
           {items.length ? (

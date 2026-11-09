@@ -1,4 +1,5 @@
-export type Subject = "english" | "math";
+import type { SUBJECTS } from "./catalog";
+export type Subject = (typeof SUBJECTS)[number];
 export type Level = "beginner" | "intermediate" | "advanced";
 export type SearchInput = {
   subject?: Subject;

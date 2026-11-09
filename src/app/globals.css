@@ -608,6 +608,19 @@ small,
   padding: 22px 26px;
   color: #375d91;
 }
+.subject-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.course-art.programming,
+.course-art.ai_usage,
+.course-art.ai_certificate,
+.course-art.ai_agent {
+  background: #eef0f8;
+  color: #42527a;
+}
 .course-art.english {
   background: #e9f1eb;
   color: #41735e;

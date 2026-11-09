@@ -1,4 +1,5 @@
 import "server-only";
+import { SUBJECTS, MAX_GRADE } from "@/contracts/catalog";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import type { ServiceContext } from "@/server/context";
@@ -10,9 +11,9 @@ const offeringInput = z
   .object({
     academyId: z.uuid(),
     title: z.string().trim().min(1).max(160),
-    subject: z.enum(["math", "english"]),
-    gradeMin: z.number().int().min(1).max(12),
-    gradeMax: z.number().int().min(1).max(12),
+    subject: z.enum(SUBJECTS),
+    gradeMin: z.number().int().min(1).max(MAX_GRADE),
+    gradeMax: z.number().int().min(1).max(MAX_GRADE),
     level: z.enum(["beginner", "intermediate", "advanced"]),
     priceWon: z.number().int().min(0).max(2147483647),
     capacity: z.number().int().min(1).max(10000),

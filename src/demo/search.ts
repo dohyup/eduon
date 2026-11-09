@@ -1,9 +1,12 @@
 import type { SearchInput, SearchResult } from "../contracts/domain";
+import { MAX_GRADE } from "../contracts/catalog";
 import { demoOfferings } from "./catalog";
 export function searchDemoOfferings(input: SearchInput): SearchResult {
   if (
     input.grade !== undefined &&
-    (!Number.isInteger(input.grade) || input.grade < 1 || input.grade > 12)
+    (!Number.isInteger(input.grade) ||
+      input.grade < 1 ||
+      input.grade > MAX_GRADE)
   )
     return { items: [], nextCursor: null };
   if (

@@ -1,4 +1,5 @@
 import { academies, demoOfferings, schedule } from "./catalog";
+import { subjectLabels } from "@/contracts/catalog";
 
 export type WorkspaceRole =
   "parent" | "student" | "owner" | "instructor" | "admin";
@@ -84,7 +85,7 @@ export const demoChildren = childProfiles.map((child) => {
   return {
     ...child,
     title: offering.title,
-    subject: offering.subject === "math" ? "수학" : "영어",
+    subject: subjectLabels[offering.subject],
     teacher: academy.teacher,
     time: schedule(offering),
     academy: academy.name,

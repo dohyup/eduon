@@ -2,6 +2,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SlidersHorizontal, Search } from "lucide-react";
+import {
+  SUBJECTS,
+  subjectLabels,
+  MAX_GRADE,
+  gradeText,
+} from "@/contracts/catalog";
 export function Filters({ values }: { values: Record<string, string> }) {
   const [open, setOpen] = useState(false);
   return (
@@ -32,21 +38,20 @@ export function Filters({ values }: { values: Record<string, string> }) {
             defaultValue={values.subject || ""}
           >
             <option value="">전체 과목</option>
-            <option value="math">수학</option>
-            <option value="english">영어</option>
+            {SUBJECTS.map((subject) => (
+              <option key={subject} value={subject}>
+                {subjectLabels[subject]}
+              </option>
+            ))}
           </select>
         </div>
         <div className="filter-field">
           <label htmlFor="grade">학년</label>
           <select id="grade" name="grade" defaultValue={values.grade || ""}>
-            <option value="">전체 학년</option>
-            {Array.from({ length: 12 }, (_, i) => (
+            <option value="">전체 학년·일반인</option>
+            {Array.from({ length: MAX_GRADE }, (_, i) => (
               <option key={i} value={i + 1}>
-                {i < 6
-                  ? `초등 ${i + 1}학년`
-                  : i < 9
-                    ? `중등 ${i - 5}학년`
-                    : `고등 ${i - 8}학년`}
+                {gradeText(i + 1)}
               </option>
             ))}
           </select>
@@ -81,7 +86,7 @@ export function Filters({ values }: { values: Record<string, string> }) {
         </Link>
         <div className="filter-note">
           <span className="eyebrow">맞춤 탐색</span>
-          <p>학년·수준·예산에 맞는 수업만 골라보세요.</p>
+          <p>학생부터 일반인까지, 대상·수준·예산에 맞게 찾아보세요.</p>
           <small>현재는 조건 기반 데모 검색입니다.</small>
         </div>
       </form>

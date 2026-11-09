@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ArrowUpRight, Clock3, Video, Users } from "lucide-react";
 import type { PublicOffering } from "@/contracts/domain";
-import { academies, gradeLabel, levelLabel, money } from "@/demo/catalog";
+import { academies, levelLabel, money } from "@/demo/catalog";
+import { subjectLabels, gradeRangeLabel } from "@/contracts/catalog";
 export function OfferingCard({ offering: o }: { offering: PublicOffering }) {
   const a = {
     name:
@@ -17,16 +18,22 @@ export function OfferingCard({ offering: o }: { offering: PublicOffering }) {
     <article className="course-card">
       <div className={`course-art ${o.subject}`} aria-hidden="true">
         <div className="art-grid" />
-        <span className="art-subject">
-          {o.subject === "math" ? "MATHEMATICS" : "ENGLISH"}
-        </span>
+        <span className="art-subject">{subjectLabels[o.subject]}</span>
         <span className="art-symbol">
-          {o.subject === "math" ? "x² + y²" : "Aa"}
+          {o.subject === "math"
+            ? "x² + y²"
+            : o.subject === "english"
+              ? "Aa"
+              : o.subject === "programming"
+                ? "{ }"
+                : "AI"}
         </span>
         <span className="art-note">
           {o.subject === "math"
             ? "질문에서 시작하는 배움"
-            : "세상을 읽는 새로운 언어"}
+            : o.subject === "english"
+              ? "세상을 읽는 새로운 언어"
+              : "직접 만들며 익히는 디지털 역량"}
         </span>
         <span className="art-tag">
           <Video size={13} />
@@ -36,11 +43,10 @@ export function OfferingCard({ offering: o }: { offering: PublicOffering }) {
       <div className="course-content">
         <div className="row">
           <span className={`badge ${o.subject === "math" ? "" : "green"}`}>
-            {o.subject === "math" ? "수학" : "영어"}
+            {subjectLabels[o.subject]}
           </span>
           <span className="muted text-sm">
-            {gradeLabel(o.gradeMin)}–{gradeLabel(o.gradeMax)} ·{" "}
-            {levelLabel[o.level]}
+            {gradeRangeLabel(o.gradeMin, o.gradeMax)} · {levelLabel[o.level]}
           </span>
         </div>
         <h3>

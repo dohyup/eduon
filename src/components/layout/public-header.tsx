@@ -6,7 +6,7 @@ import { useRef } from "react";
 import { trapDialogFocus } from "../ui/focus";
 export function Logo() {
   return (
-    <Link href="/" className="brand" aria-label="EDUON 홈">
+    <Link href="/" className="brand">
       <span className="brand-mark">
         <BookOpen size={23} />
       </span>

@@ -1,4 +1,5 @@
 import "server-only";
+import { gradeRangeLabel } from "@/contracts/catalog";
 import { z } from "zod";
 import type { LlmPort } from "@/integrations/llm/port";
 import type { Recommendation } from "./rank";
@@ -29,7 +30,7 @@ export async function explainRecommendations(
       allowedReasons: [
         ...reasons,
         `수강료 ${o.priceWon}원`,
-        `대상 학년 ${o.gradeMin}~${o.gradeMax}학년`,
+        `대상 ${gradeRangeLabel(o.gradeMin, o.gradeMax)}`,
       ],
     },
   }));

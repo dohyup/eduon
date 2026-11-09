@@ -104,14 +104,12 @@ test("원장 입점 신청과 운영자 승인이 실제 DB에 반영된다", as
   ).toBeVisible();
   await login(context, "admin");
   await page.goto("/admin/academies");
-  const item = page
-    .locator("li")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "브라우저 검증 학원",
-        exact: true,
-      }),
-    });
+  const item = page.locator("li").filter({
+    has: page.getByRole("heading", {
+      name: "브라우저 검증 학원",
+      exact: true,
+    }),
+  });
   await item.getByLabel("심사 사유").fill("합성 학원 정보와 대표자 확인 완료");
   await item.getByRole("button", { name: "승인", exact: true }).click();
   await expect(
@@ -156,47 +154,62 @@ test("공개 수업은 DB에서 검색되고 명단·초대·메일은 노출되
   ).toHaveCount(0);
 });
 
-test("원장이 수업 초안을 개설하고 공개 검색에 연결한다", async ({
-  page,
-  context,
-}) => {
-  await login(context, "owner");
-  await page.goto("/academy/classes");
-  await page
-    .getByRole("combobox", { name: "관리 학원" })
-    .selectOption(fixture.academyId);
-  const form = page.locator("form").filter({
-    has: page.getByRole("button", { name: "수업 초안 등록", exact: true }),
+for (const course of [
+  {
+    subject: "english",
+    title: "브라우저 개설 영어",
+    min: "4",
+    max: "6",
+    year: 2035,
+  },
+  {
+    subject: "ai_agent",
+    title: "브라우저 개설 AI Agent 개발",
+    min: "13",
+    max: "13",
+    year: 2036,
+  },
+])
+  test(`원장이 ${course.subject} 수업 초안을 개설하고 공개 검색에 연결한다`, async ({
+    page,
+    context,
+  }) => {
+    await login(context, "owner");
+    await page.goto("/academy/classes");
+    await page
+      .getByRole("combobox", { name: "관리 학원" })
+      .selectOption(fixture.academyId);
+    const form = page.locator("form").filter({
+      has: page.getByRole("button", { name: "수업 초안 등록", exact: true }),
+    });
+    await form.locator('[name="title"]').fill(course.title);
+    await form.locator('[name="subject"]').selectOption(course.subject);
+    await form.locator('[name="gradeMin"]').selectOption(course.min);
+    await form.locator('[name="gradeMax"]').selectOption(course.max);
+    await form.locator('[name="priceWon"]').fill("125000");
+    await form.locator('[name="capacity"]').fill("5");
+    await form.locator('[name="opensAt"]').fill("2020-01-01T09:00");
+    await form.locator('[name="closesAt"]').fill("2034-12-31T18:00");
+    await form.locator('[name="startsAt"]').fill(`${course.year}-01-01T17:00`);
+    await form.locator('[name="endsAt"]').fill(`${course.year}-01-01T17:50`);
+    await form
+      .getByRole("button", { name: "수업 초안 등록", exact: true })
+      .click();
+    const row = page.locator("li").filter({
+      has: page.getByRole("heading", {
+        name: course.title,
+        exact: true,
+      }),
+    });
+    await expect(row).toBeVisible();
+    await row.getByRole("button", { name: "수업 공개", exact: true }).click();
+    await expect(
+      row.getByRole("link", { name: "공개 화면 확인 →" }),
+    ).toBeVisible();
+    if (course.min === "13") await expect(row).toContainText("일반인");
+    await page.goto(`/classes?subject=${course.subject}&grade=${course.min}`);
+    await expect(page.getByRole("link", { name: course.title })).toBeVisible();
   });
-  await form.locator('[name="title"]').fill("브라우저 개설 영어");
-  await form.locator('[name="subject"]').selectOption("english");
-  await form.locator('[name="gradeMin"]').selectOption("4");
-  await form.locator('[name="gradeMax"]').selectOption("6");
-  await form.locator('[name="priceWon"]').fill("125000");
-  await form.locator('[name="capacity"]').fill("5");
-  await form.locator('[name="opensAt"]').fill("2020-01-01T09:00");
-  await form.locator('[name="closesAt"]').fill("2034-12-31T18:00");
-  await form.locator('[name="startsAt"]').fill("2035-01-01T17:00");
-  await form.locator('[name="endsAt"]').fill("2035-01-01T17:50");
-  await form
-    .getByRole("button", { name: "수업 초안 등록", exact: true })
-    .click();
-  const row = page.locator("li").filter({
-    has: page.getByRole("heading", {
-      name: "브라우저 개설 영어",
-      exact: true,
-    }),
-  });
-  await expect(row).toBeVisible();
-  await row.getByRole("button", { name: "수업 공개", exact: true }).click();
-  await expect(
-    row.getByRole("link", { name: "공개 화면 확인 →" }),
-  ).toBeVisible();
-  await page.goto("/classes?subject=english");
-  await expect(
-    page.getByRole("link", { name: /브라우저 개설 영어/ }),
-  ).toBeVisible();
-});
 
 test("실제 데이터 화면의 모바일·데스크톱·접근성을 확인한다", async ({
   page,
@@ -215,8 +228,12 @@ test("실제 데이터 화면의 모바일·데스크톱·접근성을 확인한
       await login(context, role);
       await page.goto(path);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-      await expect(page.getByRole('button',{name:'로그아웃',exact:true})).toBeVisible();
-      await expect(page.getByText('내역을 불러오는 중입니다…',{exact:true})).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "로그아웃", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByText("내역을 불러오는 중입니다…", { exact: true }),
+      ).toHaveCount(0);
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth),
       ).toBeLessThanOrEqual(width);

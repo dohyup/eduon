@@ -1,4 +1,5 @@
-import type { PublicOffering } from "../contracts/domain";
+import type { PublicOffering, Subject } from "../contracts/domain";
+export { gradeLabel } from "../contracts/catalog";
 export const academies = [
   {
     id: "academy-1",
@@ -14,11 +15,18 @@ export const academies = [
     intro: "읽고, 말하고, 생각하며 영어를 일상에 연결합니다.",
     teacher: "온빛 선생님",
   },
+  {
+    id: "academy-3",
+    name: "가상 디지털 배움교실",
+    area: "온라인",
+    intro: "프로그래밍부터 AI 활용과 Agent 개발까지, 실습으로 배웁니다.",
+    teacher: "가상 디지털 선생님",
+  },
 ];
 const entries: [
   string,
   string,
-  "math" | "english",
+  Subject,
   number,
   number,
   "beginner" | "intermediate" | "advanced",
@@ -85,6 +93,46 @@ const entries: [
     150000,
     5,
   ],
+  [
+    "programming-1",
+    "처음 시작하는 파이썬 프로그래밍",
+    "programming",
+    13,
+    13,
+    "beginner",
+    120000,
+    4,
+  ],
+  [
+    "ai-usage-1",
+    "일상과 업무에 바로 쓰는 AI 활용",
+    "ai_usage",
+    13,
+    13,
+    "beginner",
+    100000,
+    4,
+  ],
+  [
+    "ai-certificate-1",
+    "AI 자격증 준비를 위한 이론과 실습",
+    "ai_certificate",
+    13,
+    13,
+    "intermediate",
+    140000,
+    4,
+  ],
+  [
+    "ai-agent-1",
+    "나만의 AI Agent 개발 프로젝트",
+    "ai_agent",
+    13,
+    13,
+    "advanced",
+    160000,
+    4,
+  ],
 ];
 export const demoOfferings: PublicOffering[] = entries.map(
   (
@@ -99,7 +147,12 @@ export const demoOfferings: PublicOffering[] = entries.map(
     level,
     priceWon,
     availableSeats,
-    academyId: subject === "math" ? "academy-1" : "academy-2",
+    academyId:
+      subject === "math"
+        ? "academy-1"
+        : subject === "english"
+          ? "academy-2"
+          : "academy-3",
     sessions: Array.from({ length: 4 }, (_, week) => ({
       id: `session-${id}-${week + 1}`,
       startsAt: new Date(Date.UTC(2030, 0, i + 1 + week * 7, 8)).toISOString(),
@@ -109,12 +162,36 @@ export const demoOfferings: PublicOffering[] = entries.map(
     })),
   }),
 );
-export const gradeLabel = (g: number) =>
-  g <= 6 ? `초${g}` : g <= 9 ? `중${g - 6}` : `고${g - 9}`;
 export const levelLabel = {
   beginner: "기초",
   intermediate: "기본·응용",
   advanced: "심화",
+};
+export const demoCurricula: Partial<Record<Subject, string[]>> = {
+  programming: [
+    "파이썬 변수와 자료형 익히기",
+    "조건문과 반복문으로 문제 풀기",
+    "함수와 파일 처리로 작업 자동화하기",
+    "작은 프로그램을 만들고 개선하기",
+  ],
+  ai_usage: [
+    "AI 도구의 특징과 결과 검증 익히기",
+    "목적에 맞는 프롬프트 작성하기",
+    "문서·자료 정리와 업무에 AI 적용하기",
+    "개인정보를 지키는 활용 흐름 만들기",
+  ],
+  ai_certificate: [
+    "AI·데이터·머신러닝 기초 정리하기",
+    "생성형 AI의 원리와 활용 이해하기",
+    "개념 문제와 실습으로 준비하기",
+    "모의 평가와 오답으로 학습 점검하기",
+  ],
+  ai_agent: [
+    "AI Agent의 구성과 도구 호출 이해하기",
+    "외부 도구를 연결하는 Agent 만들기",
+    "상태와 메모리를 활용한 작업 흐름 만들기",
+    "평가와 권한 검사를 적용해 프로젝트 개선하기",
+  ],
 };
 export const money = (n: number) =>
   new Intl.NumberFormat("ko-KR").format(n) + "원";
