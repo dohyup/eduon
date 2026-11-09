@@ -35,6 +35,8 @@ export async function POST(r: Request) {
         emailRedirectTo: appOrigin() + "/api/auth/callback",
       },
     });
+    if (error?.status === 429)
+      return respond({ ok: false, code: "RATE_LIMITED" });
     if (error && error.status && error.status >= 500)
       return respond({ ok: false, code: "UNAVAILABLE" });
     return respond({ ok: true, value: { requested: true } });
