@@ -7,6 +7,7 @@ import { isDemoMode } from "@/server/config";
 import { DemoDialog } from "@/components/ui/dialog";
 import { Enroll } from "@/components/commerce/enroll";
 import { paymentReadiness } from "@/integrations/payments/provider";
+import { LearningDiscovery } from "@/components/learning/discovery";
 export default async function Detail({
   params,
 }: {
@@ -20,6 +21,7 @@ export default async function Detail({
   if (!a) notFound();
   return (
     <main id="main-content" className="container page-content">
+      <LearningDiscovery offeringIds={[o.id]} stage="detail" />
       <Link className="back-link" href="/classes">
         <ArrowLeft size={16} />
         수업 목록으로

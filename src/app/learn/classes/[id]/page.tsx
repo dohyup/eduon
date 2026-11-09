@@ -1,12 +1,18 @@
-import { WorkspaceEntry } from "@/components/workspace-entry";
-import { notFound } from "next/navigation";
-
+import { LearningEntry } from "@/components/learning/entry";
 export default async function Page({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ studentId?: string }>;
 }) {
   const { id } = await params;
-  if (id !== "math-1") notFound();
-  return <WorkspaceEntry role="student" section="classes" />;
+  const { studentId } = await searchParams;
+  return (
+    <LearningEntry
+      offeringId={id}
+      view={studentId ? "parent" : "student"}
+      studentId={studentId}
+    />
+  );
 }

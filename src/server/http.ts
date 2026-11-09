@@ -98,6 +98,7 @@ export async function handle(
   request: Request,
   fn: (ctx: ServiceContext) => Promise<Outcome<unknown>>,
   mutate = false,
+  rateScope: "mutate" | "telemetry" = "mutate",
 ) {
   try {
     if (isDemoMode()) return respond({ ok: false, code: "UNAVAILABLE" });
@@ -105,7 +106,7 @@ export async function handle(
     const actor = await getActor();
     ensure(actor, "UNAUTHENTICATED");
     const db = getDatabase();
-    if (mutate) await rateLimit(db, `mutate:${actor.userId}`, 60);
+    if (mutate) await rateLimit(db, `${rateScope}:${actor.userId}`, 60);
     return respond(await fn({ actor, db, now: () => new Date() }));
   } catch (error) {
     if (error instanceof AppError)

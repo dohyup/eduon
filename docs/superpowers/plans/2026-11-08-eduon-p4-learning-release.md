@@ -7,6 +7,19 @@
 **Tech Stack:** 이전 계획 스택 + 선택한 화상/저장소 + 선택적 LLM, Playwright/axe-core.
 **Spec:** `../specs/2026-11-08-eduon-mvp-design.md` §11~16 및 마스터 계획.
 
+## Execution status — 2026-11-09
+
+P4 내부 기능 구현과 합성 환경 검증을 진행했다. 실제 공급자·정책·스테이징 조건이 함께 있는 아래 체크 항목은 외부 증거가 없으면 전체 완료로 체크하지 않는다. 최종 근거는 [검증 기록](../../operations/final-qa.md)에 있다.
+
+| 작업  | 내부 구현                                                                       | 외부 수용 조건                                  |
+| ----- | ------------------------------------------------------------------------------- | ----------------------------------------------- |
+| P4-01 | 수강권 입장·Daily 어댑터·출결 이력·영속 수료 작업                               | Daily 실계정 통화·장애·토큰 잔여 위험 수용 대기 |
+| P4-02 | 자료 검증·quarantine·권한/서명 계약·제출/피드백 버전·UI                         | 실제 private 저장소·검사기 선택/구현/검증 대기  |
+| P4-03 | 검증 후기·신고·동일 과정 기수 개설·현재 가격 재수강·범위별 지표·선택적 LLM 방어 | 실제 PG 계약/검증 대기, LLM은 선택 기능         |
+| P4-04 | 전체 회귀·5개 폭·axe·소스 리뷰·health/운영 차단·운영 문서·로컬 SQL 성능         | 실제 스테이징·복구·경보·정책·운영 배포 대기     |
+
+출시 판정은 **NO-GO**이며 운영 배포·원격 P4 마이그레이션은 하지 않았다.
+
 ## Global Constraints
 
 마스터 Global Constraints·합성 시나리오 훅을 적용한다. 학생 입장은 시작 10분 전~종료 10분 후, 녹화 기본 비활성. 보호자는 결제 내역·연결된 자녀 현황만 조회한다. 실제 공급자가 없으면 프로덕션 연동 완료로 보고하지 않는다.
@@ -20,15 +33,23 @@
 - [ ] 취소 수강권·타 학생·미배정 강사·시간창 밖 입장 거부 테스트를 작성해 `npm run test:integration -- tests/integration/join.test.ts` RED 확인한다. `payOrder`로 활성화 후 전체 환불한 테스트 fixture를 `tests/support/learning.ts`에 만든다.
 
 ```ts
-it('결제만 한 학부모가 학생 입장권을 받지 않는다', async () => {
+it("결제만 한 학부모가 학생 입장권을 받지 않는다", async () => {
   const order = await createOrder(ctx, {
-    studentId: s.studentId, offeringId: s.offeringId, requestKey: 'join',
+    studentId: s.studentId,
+    offeringId: s.offeringId,
+    requestKey: "join",
   });
   if (!order.ok) throw new Error(order.code);
   await payOrder(systemContext(db), order.value.orderId);
-  const parentAtClass = makeContext(db, s.parent, new Date('2030-01-01T00:55:00Z'));
-  expect(await requestJoin(parentAtClass, s.sessionId))
-    .toEqual({ ok: false, code: 'FORBIDDEN' });
+  const parentAtClass = makeContext(
+    db,
+    s.parent,
+    new Date("2030-01-01T00:55:00Z"),
+  );
+  expect(await requestJoin(parentAtClass, s.sessionId)).toEqual({
+    ok: false,
+    code: "FORBIDDEN",
+  });
 });
 ```
 
@@ -45,11 +66,15 @@ it('결제만 한 학부모가 학생 입장권을 받지 않는다', async () =
 - [ ] 테스트 지원 `seedAssignment(db, s): Promise<{ assignmentId: string; materialId: string }>`를 tests/support/learning.ts에 추가한다. 학습 권한 없이 쓰기/자료 열람 불가 테스트를 작성하고 `npm run test:integration -- tests/integration/assignments.test.ts` RED 확인.
 
 ```ts
-it('보호자는 학생 과제를 대신 제출하지 않는다', async () => {
+it("보호자는 학생 과제를 대신 제출하지 않는다", async () => {
   const a = await seedAssignment(db, s);
-  expect(await submitAssignment(ctx, {
-    assignmentId: a.assignmentId, text: '답안', fileIds: [],
-  })).toEqual({ ok: false, code: 'FORBIDDEN' });
+  expect(
+    await submitAssignment(ctx, {
+      assignmentId: a.assignmentId,
+      text: "답안",
+      fileIds: [],
+    }),
+  ).toEqual({ ok: false, code: "FORBIDDEN" });
 });
 ```
 
@@ -66,9 +91,13 @@ it('보호자는 학생 과제를 대신 제출하지 않는다', async () => {
 - [ ] 완료 수강권의 학생 또는 해당 주문 보호자만 작성 가능, 수강권당 후기 1개, 중복·연결 해제 보호자 거부를 테스트한다. 아래를 `npm run test:unit -- tests/unit/recommendation-explanation.test.ts`로 RED 확인.
 
 ```ts
-it('AI 장애에도 규칙 기반 결과가 유지된다', async () => {
-  const items = rankOfferings(demoOfferings, { subject: 'math' });
-  const llm: LlmPort = { explain: async () => { throw new Error('timeout'); } };
+it("AI 장애에도 규칙 기반 결과가 유지된다", async () => {
+  const items = rankOfferings(demoOfferings, { subject: "math" });
+  const llm: LlmPort = {
+    explain: async () => {
+      throw new Error("timeout");
+    },
+  };
   expect(await explainRecommendations(items, llm)).toEqual(items);
 });
 ```
@@ -87,7 +116,7 @@ it('AI 장애에도 규칙 기반 결과가 유지된다', async () => {
 - [ ] full-journey에서 원장 신청 → 운영자 승인 → 수업 개설 → 학부모 자녀 선택/결제 → 학생 입장 → 강사 출결/과제/피드백 → 보호자 확인 → 후기/재수강을 작성한다. 아래 보안 E2E RED를 확인한다. 계정 세션 fixture는 P2의 실제 인증 테스트 지원으로 제공하며 production에 테스트 로그인 엔드포인트를 배포하지 않는다.
 
 ```ts
-test('다른 보호자는 주문을 읽지 못한다', async ({ request, orderId }) => {
+test("다른 보호자는 주문을 읽지 못한다", async ({ request, orderId }) => {
   const res = await request.get(`/api/orders/${orderId}`);
   expect([403, 404]).toContain(res.status());
 });

@@ -363,7 +363,9 @@ export function AdminPayments() {
       if (!result.ok) setError(commerceError(result.code));
       else {
         setMessage(
-          "기존 거래 작업의 재처리를 예약했습니다. 완료 여부는 서버 처리 결과를 다시 확인해 주세요.",
+          exception.kind === "complete_offering"
+            ? "수강 완료 작업의 재처리를 예약했습니다. 완료 여부는 서버 처리 결과를 다시 확인해 주세요."
+            : "기존 거래 작업의 재처리를 예약했습니다. 완료 여부는 서버 처리 결과를 다시 확인해 주세요.",
         );
         await resource.reload();
       }
@@ -403,9 +405,9 @@ export function AdminPayments() {
     }
   }
   return (
-    <CommercePanel title="결제·환불 예외 처리">
+    <CommercePanel title="결제·환불·학습 작업 확인">
       <p>
-        결제 확인 지연과 실패한 작업을 확인하세요. 재처리 접수는 환불 완료를
+        결제 확인 지연과 실패한 작업을 확인하세요. 재처리 접수는 작업 완료를
         의미하지 않습니다.
       </p>
       <ResourceState
@@ -421,7 +423,11 @@ export function AdminPayments() {
           <li className={styles.item} key={exception.id}>
             <div className={styles.row}>
               <h3>
-                {exception.refundId ? "환불 처리 확인" : "거래 처리 확인"}
+                {exception.kind === "complete_offering"
+                  ? "수강 완료 처리 확인"
+                  : exception.refundId
+                    ? "환불 처리 확인"
+                    : "거래 처리 확인"}
               </h3>
               <span className={styles.badge}>
                 {stateLabel(exception.status)}
@@ -429,8 +435,16 @@ export function AdminPayments() {
             </div>
             <dl className={styles.facts}>
               <div>
-                <dt>주문 번호</dt>
-                <dd>{exception.orderId || "주문 연결 확인 필요"}</dd>
+                <dt>
+                  {exception.kind === "complete_offering"
+                    ? "작업 번호"
+                    : "주문 번호"}
+                </dt>
+                <dd>
+                  {exception.kind === "complete_offering"
+                    ? exception.id
+                    : exception.orderId || "주문 연결 확인 필요"}
+                </dd>
               </div>
               <div>
                 <dt>처리 시도</dt>
@@ -456,7 +470,9 @@ export function AdminPayments() {
                   {busy === exception.id
                     ? "재처리 요청 중…"
                     : exception.retryJobId
-                      ? "거래 작업 재처리"
+                      ? exception.kind === "complete_offering"
+                        ? "수강 완료 작업 재처리"
+                        : "거래 작업 재처리"
                       : "기존 환불 요청 재처리"}
                 </button>
               )}

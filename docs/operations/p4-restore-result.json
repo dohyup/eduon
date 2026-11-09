@@ -1,0 +1,16 @@
+{
+  "status": "BLOCKED",
+  "reason": "Matching local pg_dump and pg_restore executables are unavailable. Embedded bundle has initdb/pg_ctl/postgres only; PATH and scoped common locations checked. No restore drill executed.",
+  "createdAt": "2026-11-09T01:24:30.331Z",
+  "scope": "local synthetic only; no dotenv or caller database URL",
+  "embedded": {
+    "directory": "C:\\dev\\eduon\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin",
+    "pgDump": false,
+    "pgRestore": false
+  },
+  "commonLocations": {
+    "programFilesPostgresql": false,
+    "toolsPostgresql": false
+  },
+  "matchingToolDirectoryFound": false
+}

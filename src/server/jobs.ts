@@ -4,19 +4,31 @@ import { z } from "zod";
 import type { Job } from "@/generated/prisma/client";
 import type { SystemContext } from "@/server/context";
 import type { PaymentPort } from "@/integrations/payments/port";
-import { getPaymentProvider } from "@/integrations/payments/provider";
+import {
+  getPaymentProvider,
+  paymentReadiness,
+} from "@/integrations/payments/provider";
 import { applyVerifiedPayment } from "@/modules/payments/confirm";
 import { processRefund } from "@/modules/payments/refunds";
 import { AppError } from "@/server/errors";
+import { completeOffering } from "@/modules/learning/completion";
+import { learningEnabled } from "@/modules/learning/access";
 
 const leaseMs = 60_000;
 const retryMinutes = [1, 5, 30];
-const supportedTypes = ["payment_event", "refund", "reconcile", "order"];
+const paymentTypes = ["payment_event", "refund", "reconcile", "order"];
 const eventPayload = z.object({ eventId: z.uuid() });
 const refundPayload = z.object({ refundId: z.uuid() });
 const orderPayload = z.object({ orderId: z.uuid() });
+const completionPayload = z
+  .object({ offeringId: z.uuid(), cursorStudentId: z.uuid().optional() })
+  .strict();
 
-async function claim(sys: SystemContext, worker: string): Promise<Job | null> {
+async function claim(
+  sys: SystemContext,
+  worker: string,
+  supportedTypes: string[],
+): Promise<Job | null> {
   // An UPDATE predicate is rechecked under PostgreSQL row locking. Only one
   // contender can replace the observed token/status, including expired leases.
   for (let round = 0; round < 3; round++) {
@@ -75,27 +87,45 @@ async function claim(sys: SystemContext, worker: string): Promise<Job | null> {
 async function execute(
   sys: SystemContext,
   job: Job,
-  port: PaymentPort,
-): Promise<string | undefined> {
+  getPort: () => PaymentPort,
+): Promise<{
+  eventId?: string;
+  continuation?: { offeringId: string; cursorStudentId: string };
+}> {
+  if (job.type === "complete_offering") {
+    const payload = completionPayload.parse(job.payloadJson);
+    const result = await completeOffering(sys, payload.offeringId, {
+      cursorStudentId: payload.cursorStudentId,
+    });
+    return result.nextCursor
+      ? {
+          continuation: {
+            offeringId: payload.offeringId,
+            cursorStudentId: result.nextCursor,
+          },
+        }
+      : {};
+  }
+  const port = getPort();
   if (job.type === "payment_event") {
     const { eventId } = eventPayload.parse(job.payloadJson);
     const event = await sys.db.providerEvent.findUnique({
       where: { id: eventId },
     });
     if (!event) throw new AppError("NOT_FOUND");
-    if (event.status === "processed") return event.id;
+    if (event.status === "processed") return { eventId: event.id };
     const payment = await port.fetchPayment(event.transactionId);
     if (payment.transactionId !== event.transactionId)
       throw new AppError("CONFLICT");
     const result = await applyVerifiedPayment(sys, payment);
     if (!result.ok) throw new AppError(result.code);
-    return event.id;
+    return { eventId: event.id };
   }
   if (job.type === "refund") {
     const { refundId } = refundPayload.parse(job.payloadJson);
     const result = await processRefund(sys, refundId, port);
     if (!result.ok) throw new AppError(result.code);
-    return;
+    return {};
   }
   const { orderId } = orderPayload.parse(job.payloadJson);
   const payment = await sys.db.payment.findUnique({ where: { orderId } });
@@ -108,6 +138,7 @@ async function execute(
     throw new AppError("CONFLICT");
   const result = await applyVerifiedPayment(sys, verified);
   if (!result.ok) throw new AppError(result.code);
+  return {};
 }
 
 /** Provider calls run after the atomic claim has committed. */
@@ -117,14 +148,20 @@ export async function runJobs(
   injectedPort?: PaymentPort,
 ) {
   z.number().int().min(1).max(100).parse(limit);
-  const port = injectedPort ?? getPaymentProvider();
+  let port = injectedPort;
+  const getPort = () => (port ??= getPaymentProvider());
+  const paymentAvailable = !!injectedPort || paymentReadiness().configured;
+  const supportedTypes = [
+    ...(learningEnabled() ? ["complete_offering"] : []),
+    ...(paymentAvailable ? paymentTypes : []),
+  ];
   const worker = randomUUID();
   let processed = 0;
   for (let i = 0; i < limit; i++) {
-    const job = await claim(sys, worker);
+    const job = await claim(sys, worker, supportedTypes);
     if (!job) break;
     try {
-      const eventId = await execute(sys, job, port);
+      const { eventId, continuation } = await execute(sys, job, getPort);
       const finished = await sys.db.$transaction(async (tx) => {
         const changed = await tx.job.updateMany({
           where: {
@@ -133,7 +170,10 @@ export async function runJobs(
             claimToken: job.claimToken,
           },
           data: {
-            status: "succeeded",
+            status: continuation ? "pending" : "succeeded",
+            ...(continuation
+              ? { payloadJson: continuation, attempts: 0, runAt: sys.now() }
+              : {}),
             lastError: null,
             leaseUntil: null,
             claimToken: null,
@@ -197,5 +237,5 @@ export async function runJobs(
       });
     }
   }
-  return { processed };
+  return { processed, paymentDeferred: !paymentAvailable };
 }

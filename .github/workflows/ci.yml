@@ -1,9 +1,9 @@
-name: EDUON P1 through P3
+name: EDUON P1 through P4
 on: [push, pull_request]
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:17
@@ -33,3 +33,4 @@ jobs:
       - run: npm run test:e2e
       - run: npm run test:e2e:p2
       - run: npm run test:e2e:p3
+      - run: npm run test:e2e:p4

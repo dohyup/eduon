@@ -5,6 +5,7 @@ import { listPublicOfferings } from "@/modules/catalog/public";
 import { isDemoMode } from "@/server/config";
 import type { SearchInput } from "@/contracts/domain";
 import { Search, ArrowUpRight } from "lucide-react";
+import { LearningDiscovery } from "@/components/learning/discovery";
 export const metadata = { title: "수업 찾기" };
 export default async function Classes({
   searchParams,
@@ -40,6 +41,10 @@ export default async function Classes({
       });
   return (
     <main id="main-content" className="container page-content">
+      <LearningDiscovery
+        offeringIds={items.map((item) => item.id)}
+        stage="search"
+      />
       <div className="page-heading">
         <span className="eyebrow">FIND YOUR CLASS</span>
         <h1>아이의 속도에 맞는 배움</h1>

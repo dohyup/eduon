@@ -100,6 +100,53 @@ function sessionData(data: CreateOfferingInput) {
   }));
 }
 
+const nextCohortInput = z
+  .object({
+    priceWon: offeringInput.shape.priceWon,
+    capacity: offeringInput.shape.capacity,
+    enrollmentOpensAt: offeringInput.shape.enrollmentOpensAt,
+    enrollmentClosesAt: offeringInput.shape.enrollmentClosesAt,
+    instructorIds: offeringInput.shape.instructorIds,
+    sessions: offeringInput.shape.sessions,
+  })
+  .strict();
+export type CreateNextCohortInput = z.input<typeof nextCohortInput>;
+async function createDraftOffering(
+  ctx: ServiceContext,
+  tx: Prisma.TransactionClient,
+  data: CreateOfferingInput,
+  courseId?: string,
+) {
+  await lockInstructors(tx, data.instructorIds);
+  await verifyInstructors(tx, data.academyId, data.instructorIds);
+  const course = courseId
+    ? { id: courseId }
+    : await tx.course.create({ data: courseData(data) });
+  const offering = await tx.offering.create({
+    data: {
+      academyId: data.academyId,
+      courseId: course.id,
+      priceWon: data.priceWon,
+      capacity: data.capacity,
+      enrollmentOpensAt: new Date(data.enrollmentOpensAt),
+      enrollmentClosesAt: new Date(data.enrollmentClosesAt),
+      instructors: {
+        create: data.instructorIds.map((userId) => ({ userId })),
+      },
+      sessions: { create: sessionData(data) },
+    },
+  });
+  await tx.auditEvent.create({
+    data: {
+      actorId: ctx.actor.userId,
+      action: "offering.created",
+      targetId: offering.id,
+      createdAt: ctx.now(),
+    },
+  });
+  return { offeringId: offering.id };
+}
+
 export function createOffering(
   ctx: ServiceContext,
   input: CreateOfferingInput,
@@ -110,32 +157,7 @@ export function createOffering(
     return ctx.db.$transaction(async (tx) => {
       await lockAcademy(tx, data.academyId);
       await requireAcademyOwner(tx, ctx.actor.userId, data.academyId);
-      await lockInstructors(tx, data.instructorIds);
-      await verifyInstructors(tx, data.academyId, data.instructorIds);
-      const course = await tx.course.create({ data: courseData(data) });
-      const offering = await tx.offering.create({
-        data: {
-          academyId: data.academyId,
-          courseId: course.id,
-          priceWon: data.priceWon,
-          capacity: data.capacity,
-          enrollmentOpensAt: new Date(data.enrollmentOpensAt),
-          enrollmentClosesAt: new Date(data.enrollmentClosesAt),
-          instructors: {
-            create: data.instructorIds.map((userId) => ({ userId })),
-          },
-          sessions: { create: sessionData(data) },
-        },
-      });
-      await tx.auditEvent.create({
-        data: {
-          actorId: ctx.actor.userId,
-          action: "offering.created",
-          targetId: offering.id,
-          createdAt: ctx.now(),
-        },
-      });
-      return { offeringId: offering.id };
+      return createDraftOffering(ctx, tx, data);
     });
   });
 }
@@ -160,6 +182,7 @@ export function updateOffering(
       const current = await tx.offering.findUnique({
         where: { id: offeringId },
         include: {
+          course: true,
           sessions: true,
           instructors: true,
           _count: {
@@ -205,8 +228,14 @@ export function updateOffering(
         "CONFLICT",
       );
       await verifyInstructors(tx, data.academyId, data.instructorIds);
-      // A fresh course revision avoids changing another cohort sharing this course.
-      const course = await tx.course.create({ data: courseData(data) });
+      // Cohort-only edits preserve identity for reenrollment; attribute edits fork it.
+      const sameCourse = Object.entries(courseData(data)).every(
+        ([field, value]) =>
+          current.course[field as keyof typeof current.course] === value,
+      );
+      const course = sameCourse
+        ? current.course
+        : await tx.course.create({ data: courseData(data) });
       await tx.offering.update({
         where: { id: offeringId },
         data: {
@@ -281,7 +310,7 @@ export function publishOffering(ctx: ServiceContext, offeringId: string) {
       const conflict = await tx.offering.findFirst({
         where: {
           id: { not: offeringId },
-          status: "published",
+          status: { in: ["published", "closed"] },
           instructors: { some: { userId: { in: data.instructorIds } } },
           sessions: {
             some: {
@@ -358,5 +387,38 @@ export function listManagedOfferings(ctx: ServiceContext, cursor?: string) {
         },
       })),
     }));
+  });
+}
+
+/** A new cohort inherits course identity server-side; only cohort fields are accepted. */
+export function createNextCohort(
+  ctx: ServiceContext,
+  sourceOfferingId: string,
+  input: CreateNextCohortInput,
+) {
+  return attempt(async () => {
+    await requireActor(ctx);
+    z.uuid().parse(sourceOfferingId);
+    const cohort = nextCohortInput.parse(input);
+    return ctx.db.$transaction(async (tx) => {
+      const ref = await tx.offering.findUnique({
+        where: { id: sourceOfferingId },
+        select: { academyId: true },
+      });
+      ensure(ref, "NOT_FOUND");
+      await lockAcademy(tx, ref.academyId);
+      await requireAcademyOwner(tx, ctx.actor.userId, ref.academyId);
+      const source = await tx.offering.findUniqueOrThrow({
+        where: { id: sourceOfferingId },
+        include: { course: true },
+      });
+      ensure(source.academyId === ref.academyId, "FORBIDDEN");
+      const data = offeringInput.parse({
+        ...source.course,
+        ...cohort,
+        academyId: source.academyId,
+      });
+      return createDraftOffering(ctx, tx, data, source.courseId);
+    });
   });
 }

@@ -97,11 +97,11 @@ export function PublicHeader({ demo = true }: { demo?: boolean }) {
           <span className="demo-dot" />
           {demo
             ? "데모 · 실제 결제 및 수강 불가"
-            : "P3 개발 · 수강·결제 내부 검증 · 실결제 미지원"}
+            : "P4 내부 검증 · 학습 운영 구현 · 실결제 미지원"}
           <span className="demo-extra">
             {demo
               ? "합성 데이터로 미리 만나는 배움이음터"
-              : "결제 서비스 선택 대기"}
+              : "외부 서비스 연결 준비 중"}
           </span>
         </div>
       </div>
@@ -126,7 +126,7 @@ export function Footer({ demo = true }: { demo?: boolean }) {
           <span>
             {demo
               ? "프로토타입 · 모든 학원·인물·수업은 가상입니다."
-              : "P3 개발 단계 · 실제 PG 결제와 온라인 수강 연동은 준비 중입니다."}
+              : "P4 내부 검증 단계 · 실제 결제·화상·파일 서비스 연결은 준비 중입니다."}
           </span>
         </div>
       </div>

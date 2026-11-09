@@ -1,4 +1,5 @@
 import "server-only";
+import { recordConversion } from "@/modules/analytics/events";
 import { z } from "zod";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import type { ServiceContext } from "@/server/context";
@@ -246,6 +247,15 @@ export function createOrder(
           targetId: order.id,
           createdAt: now,
         },
+      });
+      await recordConversion(tx, {
+        stage: "application",
+        academyId: order.academyId,
+        offeringId: order.offeringId,
+        orderId: order.id,
+        actorId: actor.id,
+        dedupeKey: `application:${order.id}`,
+        now,
       });
       return {
         orderId: order.id,

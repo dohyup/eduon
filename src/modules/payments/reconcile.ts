@@ -227,7 +227,13 @@ export function retryJob(ctx: ServiceContext, id: string) {
     const job = await ctx.db.job.findUnique({ where: { id } });
     ensure(job, "NOT_FOUND");
     ensure(
-      ["payment_event", "refund", "reconcile", "order"].includes(job.type),
+      [
+        "payment_event",
+        "refund",
+        "reconcile",
+        "order",
+        "complete_offering",
+      ].includes(job.type),
       "CONFLICT",
     );
     ensure(canRetryJob(job, now), "CONFLICT");
@@ -315,7 +321,15 @@ export function getPaymentExceptions(ctx: ServiceContext, cursor?: string) {
         AND: [
           boundary,
           {
-            type: { in: ["payment_event", "refund", "reconcile", "order"] },
+            type: {
+              in: [
+                "payment_event",
+                "refund",
+                "reconcile",
+                "order",
+                "complete_offering",
+              ],
+            },
             OR: [{ status: "failed" }, { lastError: { not: null } }],
           },
         ],
@@ -411,20 +425,18 @@ export function getPaymentExceptions(ctx: ServiceContext, cursor?: string) {
         b.id.localeCompare(a.id),
     );
     return {
-      items: items
-        .slice(0, 20)
-        .map((item) => ({
-          id: item.id,
-          orderId: item.orderId,
-          ...(item.refundId ? { refundId: item.refundId } : {}),
-          ...(item.retryJobId ? { retryJobId: item.retryJobId } : {}),
-          canRetry: item.canRetry,
-          kind: item.kind,
-          status: item.status,
-          attempts: item.attempts,
-          lastError: item.lastError,
-          nextRunAt: item.nextRunAt,
-        })),
+      items: items.slice(0, 20).map((item) => ({
+        id: item.id,
+        orderId: item.orderId,
+        ...(item.refundId ? { refundId: item.refundId } : {}),
+        ...(item.retryJobId ? { retryJobId: item.retryJobId } : {}),
+        canRetry: item.canRetry,
+        kind: item.kind,
+        status: item.status,
+        attempts: item.attempts,
+        lastError: item.lastError,
+        nextRunAt: item.nextRunAt,
+      })),
       nextCursor: items.length > 20 ? items[19].id : null,
     };
   });

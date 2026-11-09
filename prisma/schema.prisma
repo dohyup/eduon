@@ -8,6 +8,17 @@ datasource db {
 }
 
 model User {
+  Attendance_authorId         Attendance[]         @relation("Attendance_authorId")
+  AttendanceRevision_authorId AttendanceRevision[] @relation("AttendanceRevision_authorId")
+  Material_uploaderId         Material[]           @relation("Material_uploaderId")
+  Assignment_createdById      Assignment[]         @relation("Assignment_createdById")
+  Feedback_authorId           Feedback[]           @relation("Feedback_authorId")
+  Review_authorId             Review[]             @relation("Review_authorId")
+  Review_moderatedById        Review[]             @relation("Review_moderatedById")
+  ReviewReport_reporterId     ReviewReport[]       @relation("ReviewReport_reporterId")
+  ReviewReport_resolvedById   ReviewReport[]       @relation("ReviewReport_resolvedById")
+  AnalyticsEvent_actorId      AnalyticsEvent[]     @relation("AnalyticsEvent_actorId")
+
   id                    String                 @id @default(uuid()) @db.Uuid
   email                 String                 @unique
   platformAdmin         Boolean                @default(false)
@@ -24,6 +35,11 @@ model User {
 }
 
 model Academy {
+  Attendance_academyId     Attendance[]     @relation("Attendance_academyId")
+  Material_academyId       Material[]       @relation("Material_academyId")
+  Assignment_academyId     Assignment[]     @relation("Assignment_academyId")
+  AnalyticsEvent_academyId AnalyticsEvent[] @relation("AnalyticsEvent_academyId")
+
   orders                Order[]
   settlementEntries     SettlementEntry[]
   id                    String                 @id @default(uuid()) @db.Uuid
@@ -54,6 +70,10 @@ model AcademyMembership {
 }
 
 model StudentProfile {
+  Attendance_studentId    Attendance[] @relation("Attendance_studentId")
+  Material_ownerStudentId Material[]   @relation("Material_ownerStudentId")
+  Submission_studentId    Submission[] @relation("Submission_studentId")
+
   orders        Order[]
   id            String              @id @default(uuid()) @db.Uuid
   name          String
@@ -126,6 +146,12 @@ model Course {
 }
 
 model Offering {
+  Attendance_offeringId     Attendance[]     @relation("Attendance_offeringId")
+  Material_offeringId       Material[]       @relation("Material_offeringId")
+  Assignment_offeringId     Assignment[]     @relation("Assignment_offeringId")
+  Submission_offeringId     Submission[]     @relation("Submission_offeringId")
+  AnalyticsEvent_offeringId AnalyticsEvent[] @relation("AnalyticsEvent_offeringId")
+
   orders             Order[]
   id                 String                 @id @default(uuid()) @db.Uuid
   courseId           String                 @db.Uuid
@@ -150,6 +176,10 @@ model Offering {
 }
 
 model Session {
+  Attendance_sessionId Attendance[] @relation("Attendance_sessionId")
+  Material_sessionId   Material[]   @relation("Material_sessionId")
+  Assignment_sessionId Assignment[] @relation("Assignment_sessionId")
+
   enrollmentSessions EnrollmentSession[]
   id                 String              @id @default(uuid()) @db.Uuid
   offeringId         String              @db.Uuid
@@ -174,6 +204,10 @@ model InstructorAssignment {
 }
 
 model Enrollment {
+  Attendance_enrollmentId     Attendance[]     @relation("Attendance_enrollmentId")
+  Review_enrollmentId         Review?          @relation("Review_enrollmentId")
+  AnalyticsEvent_enrollmentId AnalyticsEvent[] @relation("AnalyticsEvent_enrollmentId")
+
   orderId    String?             @unique @db.Uuid
   order      Order?              @relation(fields: [orderId], references: [id], onDelete: Restrict)
   sessions   EnrollmentSession[]
@@ -216,6 +250,8 @@ model RecommendationEvent {
 }
 
 model Order {
+  AnalyticsEvent_orderId AnalyticsEvent[] @relation("AnalyticsEvent_orderId")
+
   id                String            @id @default(uuid()) @db.Uuid
   parentId          String            @db.Uuid
   studentId         String            @db.Uuid
@@ -403,4 +439,219 @@ model Job {
 
   @@index([status, runAt])
   @@index([status, leaseUntil])
+}
+
+model Attendance {
+  revisions AttendanceRevision[] @relation("AttendanceRevision_attendanceId")
+
+  id           String         @id @default(uuid()) @db.Uuid
+  academyId    String         @db.Uuid
+  academy      Academy        @relation("Attendance_academyId", fields: [academyId], references: [id], onDelete: Restrict)
+  offeringId   String         @db.Uuid
+  offering     Offering       @relation("Attendance_offeringId", fields: [offeringId], references: [id], onDelete: Restrict)
+  sessionId    String         @db.Uuid
+  session      Session        @relation("Attendance_sessionId", fields: [sessionId], references: [id], onDelete: Restrict)
+  enrollmentId String         @db.Uuid
+  enrollment   Enrollment     @relation("Attendance_enrollmentId", fields: [enrollmentId], references: [id], onDelete: Restrict)
+  studentId    String         @db.Uuid
+  student      StudentProfile @relation("Attendance_studentId", fields: [studentId], references: [id], onDelete: Restrict)
+  authorId     String         @db.Uuid
+  author       User           @relation("Attendance_authorId", fields: [authorId], references: [id], onDelete: Restrict)
+  status       String
+  reason       String
+  recordedAt   DateTime       @default(now())
+
+  @@unique([sessionId, studentId])
+  @@index([academyId])
+  @@index([offeringId])
+  @@index([sessionId])
+  @@index([enrollmentId])
+  @@index([studentId])
+  @@index([authorId])
+}
+
+model AttendanceRevision {
+  id           String     @id @default(uuid()) @db.Uuid
+  attendanceId String     @db.Uuid
+  attendance   Attendance @relation("AttendanceRevision_attendanceId", fields: [attendanceId], references: [id], onDelete: Restrict)
+  authorId     String     @db.Uuid
+  author       User       @relation("AttendanceRevision_authorId", fields: [authorId], references: [id], onDelete: Restrict)
+  status       String
+  reason       String
+  createdAt    DateTime   @default(now())
+
+  @@index([attendanceId])
+  @@index([authorId])
+}
+
+model Material {
+  SubmissionFile_materialId SubmissionFile[] @relation("SubmissionFile_materialId")
+
+  id             String          @id @default(uuid()) @db.Uuid
+  academyId      String          @db.Uuid
+  academy        Academy         @relation("Material_academyId", fields: [academyId], references: [id], onDelete: Restrict)
+  offeringId     String          @db.Uuid
+  offering       Offering        @relation("Material_offeringId", fields: [offeringId], references: [id], onDelete: Restrict)
+  sessionId      String?         @db.Uuid
+  session        Session?        @relation("Material_sessionId", fields: [sessionId], references: [id], onDelete: Restrict)
+  uploaderId     String          @db.Uuid
+  uploader       User            @relation("Material_uploaderId", fields: [uploaderId], references: [id], onDelete: Restrict)
+  ownerStudentId String?         @db.Uuid
+  ownerStudent   StudentProfile? @relation("Material_ownerStudentId", fields: [ownerStudentId], references: [id], onDelete: Restrict)
+  purpose        String
+  objectKey      String          @unique
+  filename       String
+  mime           String
+  bytes          Int
+  sha256         String
+  scanStatus     String          @default("quarantined")
+  deletedAt      DateTime?
+  createdAt      DateTime        @default(now())
+
+  @@index([academyId])
+  @@index([offeringId])
+  @@index([sessionId])
+  @@index([uploaderId])
+  @@index([ownerStudentId])
+}
+
+model Assignment {
+  submissions Submission[] @relation("Submission_assignmentId")
+
+  id           String   @id @default(uuid()) @db.Uuid
+  academyId    String   @db.Uuid
+  academy      Academy  @relation("Assignment_academyId", fields: [academyId], references: [id], onDelete: Restrict)
+  offeringId   String   @db.Uuid
+  offering     Offering @relation("Assignment_offeringId", fields: [offeringId], references: [id], onDelete: Restrict)
+  sessionId    String?  @db.Uuid
+  session      Session? @relation("Assignment_sessionId", fields: [sessionId], references: [id], onDelete: Restrict)
+  title        String
+  instructions String
+  dueAt        DateTime
+  createdById  String   @db.Uuid
+  creator      User     @relation("Assignment_createdById", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt    DateTime @default(now())
+
+  @@index([academyId])
+  @@index([offeringId])
+  @@index([sessionId])
+  @@index([createdById])
+}
+
+model Submission {
+  files    SubmissionFile[] @relation("SubmissionFile_submissionId")
+  feedback Feedback[]       @relation("Feedback_submissionId")
+
+  id           String         @id @default(uuid()) @db.Uuid
+  academyId    String         @db.Uuid
+  offeringId   String         @db.Uuid
+  offering     Offering       @relation("Submission_offeringId", fields: [offeringId], references: [id], onDelete: Restrict)
+  assignmentId String         @db.Uuid
+  assignment   Assignment     @relation("Submission_assignmentId", fields: [assignmentId], references: [id], onDelete: Restrict)
+  studentId    String         @db.Uuid
+  student      StudentProfile @relation("Submission_studentId", fields: [studentId], references: [id], onDelete: Restrict)
+  version      Int
+  text         String
+  late         Boolean        @default(false)
+  submittedAt  DateTime       @default(now())
+
+  @@unique([assignmentId, studentId, version])
+  @@index([offeringId])
+  @@index([assignmentId])
+  @@index([studentId])
+}
+
+model SubmissionFile {
+  id           String     @id @default(uuid()) @db.Uuid
+  academyId    String     @db.Uuid
+  offeringId   String     @db.Uuid
+  studentId    String     @db.Uuid
+  submissionId String     @db.Uuid
+  submission   Submission @relation("SubmissionFile_submissionId", fields: [submissionId], references: [id], onDelete: Restrict)
+  materialId   String     @db.Uuid
+  material     Material   @relation("SubmissionFile_materialId", fields: [materialId], references: [id], onDelete: Restrict)
+
+  @@unique([submissionId, materialId])
+  @@index([submissionId])
+}
+
+model Feedback {
+  id           String     @id @default(uuid()) @db.Uuid
+  academyId    String     @db.Uuid
+  offeringId   String     @db.Uuid
+  submissionId String     @db.Uuid
+  submission   Submission @relation("Feedback_submissionId", fields: [submissionId], references: [id], onDelete: Restrict)
+  version      Int
+  authorId     String     @db.Uuid
+  author       User       @relation("Feedback_authorId", fields: [authorId], references: [id], onDelete: Restrict)
+  text         String
+  createdAt    DateTime   @default(now())
+
+  @@unique([submissionId, version])
+  @@index([submissionId])
+  @@index([authorId])
+}
+
+model Review {
+  reports ReviewReport[] @relation("ReviewReport_reviewId")
+
+  id            String     @id @default(uuid()) @db.Uuid
+  enrollmentId  String     @unique @db.Uuid
+  enrollment    Enrollment @relation("Review_enrollmentId", fields: [enrollmentId], references: [id], onDelete: Restrict)
+  authorId      String     @db.Uuid
+  author        User       @relation("Review_authorId", fields: [authorId], references: [id], onDelete: Restrict)
+  rating        Int
+  text          String
+  hiddenAt      DateTime?
+  hiddenReason  String?
+  moderatedById String?    @db.Uuid
+  moderator     User?      @relation("Review_moderatedById", fields: [moderatedById], references: [id], onDelete: Restrict)
+  createdAt     DateTime   @default(now())
+
+  @@index([authorId])
+  @@index([moderatedById])
+}
+
+model ReviewReport {
+  id               String    @id @default(uuid()) @db.Uuid
+  reviewId         String    @db.Uuid
+  review           Review    @relation("ReviewReport_reviewId", fields: [reviewId], references: [id], onDelete: Restrict)
+  reporterId       String    @db.Uuid
+  reporter         User      @relation("ReviewReport_reporterId", fields: [reporterId], references: [id], onDelete: Restrict)
+  reason           String
+  status           String    @default("open")
+  resolution       String?
+  resolutionReason String?
+  resolvedById     String?   @db.Uuid
+  resolver         User?     @relation("ReviewReport_resolvedById", fields: [resolvedById], references: [id], onDelete: Restrict)
+  resolvedAt       DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@unique([reviewId, reporterId])
+  @@index([reviewId])
+  @@index([reporterId])
+  @@index([resolvedById])
+}
+
+model AnalyticsEvent {
+  id           String      @id @default(uuid()) @db.Uuid
+  academyId    String?     @db.Uuid
+  academy      Academy?    @relation("AnalyticsEvent_academyId", fields: [academyId], references: [id], onDelete: Restrict)
+  offeringId   String?     @db.Uuid
+  offering     Offering?   @relation("AnalyticsEvent_offeringId", fields: [offeringId], references: [id], onDelete: Restrict)
+  orderId      String?     @db.Uuid
+  order        Order?      @relation("AnalyticsEvent_orderId", fields: [orderId], references: [id], onDelete: Restrict)
+  enrollmentId String?     @db.Uuid
+  enrollment   Enrollment? @relation("AnalyticsEvent_enrollmentId", fields: [enrollmentId], references: [id], onDelete: Restrict)
+  actorId      String?     @db.Uuid
+  actor        User?       @relation("AnalyticsEvent_actorId", fields: [actorId], references: [id], onDelete: Restrict)
+  stage        String
+  dedupeKey    String      @unique
+  createdAt    DateTime    @default(now())
+
+  @@index([academyId])
+  @@index([offeringId])
+  @@index([orderId])
+  @@index([enrollmentId])
+  @@index([actorId])
 }

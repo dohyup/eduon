@@ -1,4 +1,5 @@
 import "server-only";
+import { recordConversion } from "@/modules/analytics/events";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import type { ServiceContext, SystemContext } from "@/server/context";
@@ -120,6 +121,15 @@ export function applyVerifiedPayment(
         update: { verifiedAt: now },
       });
       await postPaymentLedger(tx, order, payment.id, now);
+      if (p.status === "paid")
+        await recordConversion(tx, {
+          stage: "paid",
+          academyId: order.academyId,
+          offeringId: order.offeringId,
+          orderId: order.id,
+          dedupeKey: `paid:${order.id}`,
+          now,
+        });
       if (["refunded", "cancelled", "partially_refunded"].includes(p.status)) {
         const refunded = await tx.refund.aggregate({
           where: { orderId: order.id, status: "succeeded" },

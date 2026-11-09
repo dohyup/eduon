@@ -1,6 +1,6 @@
 # EDUON · 배움이음터
 
-소규모 학원의 온라인 전환과 학생의 수업 탐색을 연결하는 **P1 반응형 화면, P2 인증·학원 운영 기반, P3 수강·결제 내부 테스트 구현**입니다.
+소규모 학원의 온라인 전환과 학생의 수업 탐색을 연결하는 **P1 반응형 화면, P2 인증·학원 운영 기반, P3 수강·결제, P4 학습 운영의 내부 테스트 구현**입니다. 실제 시범 운영 출시는 제공자·정책·스테이징 검증이 남아 있습니다.
 
 ## 실행
 
@@ -36,9 +36,11 @@ P2는 서버 권한 검사, 자녀 등록·학생 초대, 학원 신청·심사�
 
 P3는 좌석 예약·정책 스냅샷·중복 방지 주문, 결제 사실 검증 후 수강권 생성, 부분 환불, 만료·지연 결제 보상, 영속 재처리 작업과 정산 원장을 제공합니다. 사용자가 PG 선택을 보류하여 **격리된 테스트 환경에서만 가짜 결제 제공자**를 사용합니다. 실제 인증 모드·운영 빌드에서 가짜 결제를 실행할 수 없고, 미설정 공급자의 결제 API는 차단됩니다. 원격 DB에는 P3 마이그레이션을 적용하지 않았습니다. [결제 결정 기록](docs/operations/commerce-decisions.md)을 참고하세요.
 
+P4는 수강권과 시간창을 확인한 수업 입장, 담당 강사 출결·수정 이력, 과제·재제출·피드백 버전, 현재 보호자 조회, 검증된 수강 후기·신고 처리, 같은 과정 다음 기수 개설·새 가격 재수강, 범위별 지표를 제공합니다. Daily Prebuilt를 선택했고 실계정 연결은 대기 중입니다. 실제 파일 저장소·검사기는 아직 연결하지 않았으며 미검사 파일은 다운로드하지 못합니다. 원격 P4 마이그레이션은 적용하지 않았고 `LEARNING_ENABLED=false`를 유지합니다. [최종 검증](docs/operations/final-qa.md)과 [출시 관문](docs/operations/release-checklist.md)을 참고하세요.
+
 P1 데모가 필요하면 로컬 환경변수 `DEMO_MODE=true`로 실행합니다. 이 모드의 저장은 현재 페이지 메모리에만 남고 새로고침하면 초기화됩니다. 데모 모드에서는 실제 변경 API를 사용할 수 없습니다.
 
-P1 학원 2곳·수업 6개·각 수업 4회차는 모두 합성 데이터입니다. P1 데모에서는 실제 인증·DB를 사용하지 않습니다. P3 결제·환불 브라우저 검증도 별도 합성 계정과 로컬 테스트 DB를 사용합니다. 실제 PG·AI 모델·화상회의·파일 업로드는 연결하지 않았습니다.
+P1 학원 2곳·수업 6개·각 수업 4회차는 모두 합성 데이터입니다. P1 데모에서는 실제 인증·DB를 사용하지 않습니다. P3/P4 브라우저 검증도 별도 합성 계정과 로컬 테스트 DB를 사용합니다. 실제 PG·AI 모델·화상회의·파일 업로드 서비스는 연결하지 않았습니다.
 
 ## 검증
 
@@ -53,9 +55,10 @@ npm run build
 npm run test:e2e
 npm run test:e2e:p2
 npm run test:e2e:p3
+npm run test:e2e:p4
 ```
 
-브라우저 테스트는 별도의 3100(P1)·3101(P2)·3102(P3) 서버와 분리된 빌드·결과 디렉터리를 사용합니다. P2/P3 테스트는 임시 PostgreSQL과 프로덕션에서 금지된 서명 테스트 세션을 사용합니다. 실제 Supabase/Resend 키를 테스트 서버에 전달하지 않습니다. 네트워크/프로세스 제한이 있는 환경에서는 로컬 서버와 Chromium 실행 권한이 필요합니다.
+브라우저 테스트는 별도의 3100(P1)·3101(P2)·3102(P3)·3103(P4) 서버와 분리된 빌드·결과 디렉터리를 사용합니다. P2/P3/P4 테스트는 임시 PostgreSQL과 프로덕션에서 금지된 서명 테스트 세션을 사용합니다. 실제 Supabase/Resend/Daily 키를 테스트 서버에 전달하지 않습니다. 네트워크/프로세스 제한이 있는 환경에서는 로컬 서버와 Chromium 실행 권한이 필요합니다.
 
 대표 화면 캡처: 서버 실행 후 `node scripts/qa-screenshots.mjs`.
 
@@ -70,6 +73,13 @@ npm run test:e2e:p3
 - `docs/operations/p3-qa.md`: P3 구현·검증·제공자 미선택 범위
 - `docs/operations/commerce-decisions.md`: 테스트 정책·결제 서비스 추천·활성화 경계
 - `docs/operations/payment-recovery.md`: 서명 스케줄러·작업 복구·운영자 재처리
+- `docs/operations/final-qa.md`: P4 구현·보안·브라우저 검증 결과와 출시 판정
+- `docs/operations/provider-contracts.md`: Daily 선택·잔여 위험·저장소 추천과 검증 구분
+- `docs/operations/release-checklist.md`: 운영 시작 관문과 미완료 항목
+- `docs/operations/incident-runbook.md`: 경보·장애·키 교체·롤백 대응
+- `docs/operations/backup-restore.md`: 백업·복구 훈련과 현재 증거
+- `docs/operations/privacy-retention.md`: 개인정보·보관 정책 검토 초안
+- `docs/operations/performance.md`: 로컬 합성 성능·SQL 계획·스테이징 한계
 - `docs/operations/dependencies.md`: 버전·의존성 확인 근거
 
 P1 합성 데이터는 `src/demo`, P2 업무 모듈은 `src/modules`, 서버·통합 어댑터는 `src/server`와 `src/integrations`에 분리되어 있습니다. CI는 타입·린트·단위·빌드·E2E를 실행하도록 구성했으며 원격 CI 실행은 별도입니다.

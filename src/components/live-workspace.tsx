@@ -7,6 +7,12 @@ import type { FormEvent, ReactNode } from "react";
 import styles from "./live-workspace.module.css";
 import { ParentOrders } from "./commerce/orders";
 import { AcademyFinance, AdminPayments } from "./commerce/finance";
+import { LearningHome, ParentLearning } from "./learning/home";
+import { AdminReports } from "./learning/reports";
+import { LearningAnalytics } from "./learning/analytics";
+import { NextCohortForm } from "./learning/cohort";
+import { useLearningResource } from "./learning/shared";
+import type { Readiness } from "./learning/shared";
 
 type Role = "parent" | "student" | "owner" | "instructor" | "admin";
 type Result<T> =
@@ -65,6 +71,7 @@ const info: Record<
     nav: [
       ["학부모 홈", "/parent"],
       ["자녀 관리", "/parent/children"],
+      ["학습 현황", "/parent/learning"],
       ["결제 내역", "/parent/orders"],
     ],
   },
@@ -99,6 +106,7 @@ const info: Record<
       ["운영 현황", "/admin"],
       ["학원 심사", "/admin/academies"],
       ["거래 관리", "/admin/payments"],
+      ["후기 신고", "/admin/reports"],
     ],
   },
 };
@@ -256,6 +264,9 @@ export function LiveWorkspace({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const learningReadiness = useLearningResource<Readiness>(
+    role === "owner" ? "/api/learning/readiness" : null,
+  );
   const [me, setMe] = useState<Me | null>(null);
   const [academies, setAcademies] = useState<Academy[]>([]);
   const [offerings, setOfferings] = useState<Offering[]>([]);
@@ -285,7 +296,7 @@ export function LiveWorkspace({
         }
         setLoadError("");
         setMe(current.value);
-        if (role === "owner" || role === "admin") {
+        if (role === "owner" || (role === "admin" && section !== "reports")) {
           const result = await api<Academy[]>(
             role === "admin" ? "/api/academies?review=true" : "/api/academies",
             undefined,
@@ -296,7 +307,7 @@ export function LiveWorkspace({
             setAcademyCursor(result.nextCursor ?? null);
           } else setLoadError(errorMessage(result.code));
         }
-        if (role === "owner" || role === "instructor") {
+        if (role === "owner") {
           const result = await api<Offering[]>(
             "/api/offerings",
             undefined,
@@ -316,7 +327,7 @@ export function LiveWorkspace({
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [role],
+    [role, section],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -406,6 +417,20 @@ export function LiveWorkspace({
     }
   }
   const meta = info[role];
+  const heading =
+    role === "parent" && section === "learning"
+      ? {
+          title: "아이의 학습을 함께 확인해요",
+          description:
+            "현재 연결된 자녀의 출결, 과제와 강사 피드백을 확인합니다.",
+        }
+      : role === "admin" && section === "reports"
+        ? {
+            title: "수강 후기 신고를 검토하세요",
+            description:
+              "신고된 후기와 검토 사유를 확인하고 공개 여부를 기록합니다.",
+          }
+        : meta;
   const ownedMemberships =
     me?.memberships.filter((member) => member.role === "owner") ?? [];
   const academyId = selectedAcademy || ownedMemberships[0]?.academy.id || "";
@@ -506,8 +531,8 @@ export function LiveWorkspace({
         <div className={styles.body}>
           <header className={styles.heading}>
             <p className={styles.eyebrow}>MY EDUON</p>
-            <h1>{meta.title}</h1>
-            <p>{meta.description}</p>
+            <h1>{heading.title}</h1>
+            <p>{heading.description}</p>
           </header>
           {loading && (
             <p className={styles.empty} role="status">
@@ -574,7 +599,12 @@ export function LiveWorkspace({
                       </p>
                     </div>
                   )}
-                  {section === "orders" ? (
+                  {section === "learning" ? (
+                    <ParentLearning
+                      students={me.children}
+                      verified={Boolean(me.user.guardianVerifiedAt)}
+                    />
+                  ) : section === "orders" ? (
                     <ParentOrders />
                   ) : (
                     <>
@@ -711,9 +741,9 @@ export function LiveWorkspace({
                         {gradeText(me.student.grade)} · 보호자와 연결된 학생
                         계정입니다.
                       </p>
-                      <p className={styles.empty}>
-                        수강 신청과 수업 입장은 다음 단계에서 연결됩니다. 현재
-                        활성 수강권이나 화상수업을 제공하지 않습니다.
+                      <p>
+                        수강 중인 수업에서 일정, 과제와 강사 피드백을
+                        확인하세요.
                       </p>
                       <Link className={styles.secondary} href="/classes">
                         공개 수업 찾기
@@ -722,10 +752,18 @@ export function LiveWorkspace({
                   ) : (
                     <InvitationAccept kind="student" />
                   )}
+                  {me.student && <LearningHome view="student" />}
                 </>
               )}
               {role === "owner" && (
                 <>
+                  {section === "overview" && (
+                    <LearningAnalytics
+                      academies={ownedMemberships.map(
+                        (member) => member.academy,
+                      )}
+                    />
+                  )}
                   {section === "finance" ? (
                     <AcademyFinance memberships={me.memberships} />
                   ) : section === "students" ? (
@@ -1163,7 +1201,7 @@ export function LiveWorkspace({
                   )}
                 </>
               )}
-              {(role === "owner" || role === "instructor") &&
+              {role === "owner" &&
                 section !== "finance" &&
                 section !== "students" && (
                   <Panel
@@ -1227,6 +1265,28 @@ export function LiveWorkspace({
                                 공개 화면 확인 →
                               </Link>
                             )}
+                            {learningReadiness.value?.enabled &&
+                              offering.status !== "draft" && (
+                                <NextCohortForm
+                                  offeringId={offering.id}
+                                  title={offering.course.title}
+                                  priceWon={offering.priceWon}
+                                  capacity={offering.capacity}
+                                  instructors={[
+                                    {
+                                      userId: me.user.id,
+                                      email: me.user.email,
+                                    },
+                                    ...(me.instructors ?? []).filter(
+                                      (member) =>
+                                        member.academyId ===
+                                          offering.academyId &&
+                                        member.userId !== me.user.id,
+                                    ),
+                                  ]}
+                                  onCreated={() => load()}
+                                />
+                              )}
                           </li>
                         ))}
                       </ul>
@@ -1251,11 +1311,19 @@ export function LiveWorkspace({
                     )}
                   </Panel>
                 )}
-              {role === "instructor" && <InvitationAccept kind="instructor" />}
+              {role === "instructor" && (
+                <>
+                  <LearningHome view="instructor" />
+                  <InvitationAccept kind="instructor" />
+                </>
+              )}
               {role === "admin" &&
                 (me.user.platformAdmin ? (
                   <>
-                    {section === "payments" ? (
+                    {section === "overview" && <LearningAnalytics platform />}
+                    {section === "reports" ? (
+                      <AdminReports />
+                    ) : section === "payments" ? (
                       <AdminPayments />
                     ) : (
                       <>

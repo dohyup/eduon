@@ -8,6 +8,7 @@ export default defineConfig([
     ".next/**",
     ".next-p2/**",
     ".next-p3/**",
+    ".next-p4/**",
     ".next-p1/**",
     ".tmp/**",
     "src/generated/**",
@@ -15,6 +16,7 @@ export default defineConfig([
     "test-results/**",
     "test-results-p2/**",
     "test-results-p3/**",
+    "test-results-p4/**",
     "next-env.d.ts",
   ]),
 ]);

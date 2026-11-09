@@ -8,10 +8,7 @@ import {
   claimSchedulerNonce,
   reconcilePayments,
 } from "@/modules/payments/reconcile";
-import {
-  getPaymentProvider,
-  paymentReadiness,
-} from "@/integrations/payments/provider";
+import { scheduleOfferingCompletions } from "@/modules/learning/completion";
 
 export const runtime = "nodejs";
 const bodySchema = z
@@ -52,9 +49,8 @@ export async function POST(request: Request) {
     const parsed = bodySchema.parse(
       JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(raw)),
     );
-    if (isDemoMode() || !paymentReadiness().configured)
+    if (isDemoMode())
       return Response.json({ error: "PROVIDER_UNAVAILABLE" }, { status: 503 });
-    const port = getPaymentProvider();
     const sys = {
       db: getDatabase(),
       now: () => new Date(),
@@ -63,9 +59,15 @@ export async function POST(request: Request) {
     if (!(await claimSchedulerNonce(sys, auth.nonce)))
       return Response.json({ error: "JOB_REPLAY" }, { status: 409 });
     const expiration = await expireReservations(sys);
-    const reconciliation = await reconcilePayments(sys, port);
-    const jobs = await runJobs(sys, parsed.limit, port);
-    return Response.json({ ...expiration, ...reconciliation, ...jobs });
+    const reconciliation = await reconcilePayments(sys);
+    const completion = await scheduleOfferingCompletions(sys);
+    const jobs = await runJobs(sys, parsed.limit);
+    return Response.json({
+      ...expiration,
+      ...reconciliation,
+      ...completion,
+      ...jobs,
+    });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "JOB_FAILED";
     if (reason === "BODY_TOO_LARGE")
