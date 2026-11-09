@@ -1,0 +1,113 @@
+{
+  "status": "PASSED",
+  "createdAt": "2026-11-09T08:10:41.966Z",
+  "sourceCommit": "54383b9",
+  "scope": "Real Supabase PostgreSQL and application services; synthetic writes in one rolled-back transaction. Not an authenticated HTTP/UI test.",
+  "verifiedClientTls": true,
+  "migrations": [
+    {
+      "name": "0001_identity_catalog",
+      "checksumMatches": true,
+      "finishedAt": "2026-11-08T16:56:24.121Z"
+    },
+    {
+      "name": "0002_commerce",
+      "checksumMatches": true,
+      "finishedAt": "2026-11-09T08:08:17.532Z"
+    },
+    {
+      "name": "0003_learning",
+      "checksumMatches": true,
+      "finishedAt": "2026-11-09T08:08:20.200Z"
+    },
+    {
+      "name": "0004_catalog_expansion",
+      "checksumMatches": true,
+      "finishedAt": "2026-11-09T08:08:20.388Z"
+    }
+  ],
+  "allPublicTablesRls": true,
+  "publicTableCount": 35,
+  "cases": [
+    {
+      "subject": "programming",
+      "grade": 13,
+      "created": true,
+      "published": true,
+      "searchFound": true,
+      "schoolGradeExcluded": true
+    },
+    {
+      "subject": "ai_usage",
+      "grade": 13,
+      "created": true,
+      "published": true,
+      "searchFound": true,
+      "schoolGradeExcluded": true
+    },
+    {
+      "subject": "ai_certificate",
+      "grade": 13,
+      "created": true,
+      "published": true,
+      "searchFound": true,
+      "schoolGradeExcluded": true
+    },
+    {
+      "subject": "ai_agent",
+      "grade": 13,
+      "created": true,
+      "published": true,
+      "searchFound": true,
+      "schoolGradeExcluded": true
+    }
+  ],
+  "unauthorizedRejected": true,
+  "generalProfileStored": true,
+  "allSyntheticWritesRolledBack": true,
+  "existingApplicationRowsPreserved": true,
+  "unchangedUserPermissions": true,
+  "dataApiUserVisibleRows": {
+    "anon": 0,
+    "authenticated": 0
+  },
+  "postVerificationCounts": {
+    "Academy": 0,
+    "AcademyMembership": 0,
+    "AnalyticsEvent": 0,
+    "Assignment": 0,
+    "Attendance": 0,
+    "AttendanceRevision": 0,
+    "AuditEvent": 0,
+    "Course": 0,
+    "Enrollment": 0,
+    "EnrollmentSession": 0,
+    "Feedback": 0,
+    "GuardianLink": 0,
+    "InstructorAssignment": 0,
+    "InstructorInvitation": 0,
+    "Job": 0,
+    "Material": 0,
+    "Offering": 0,
+    "Order": 0,
+    "Payment": 0,
+    "ProviderEvent": 0,
+    "RateLimit": 2,
+    "RecommendationEvent": 0,
+    "Refund": 0,
+    "RefundSession": 0,
+    "Review": 0,
+    "ReviewReport": 0,
+    "SeatReservation": 0,
+    "Session": 0,
+    "SettlementEntry": 0,
+    "StudentInvitation": 0,
+    "StudentProfile": 0,
+    "Submission": 0,
+    "SubmissionFile": 0,
+    "User": 1,
+    "_prisma_migrations": 4
+  },
+  "realPaymentOrVideoCalls": false,
+  "providerFlagsChanged": false
+}
