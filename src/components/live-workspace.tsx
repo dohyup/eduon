@@ -17,6 +17,27 @@ type Child = {
   grade: number;
   accountUserId: string | null;
 };
+type ZoomAccountState = {
+  connected: boolean;
+  status:
+    | "connected"
+    | "expired"
+    | "reauth_required"
+    | "disconnected"
+    | "error"
+    | "unlinked";
+  zoomUserId: string | null;
+  maskedEmail: string | null;
+  displayName: string | null;
+  accountType: number | null;
+  cloudRecordingAllowed: boolean;
+  tokenExpiresAt: string | null;
+  isTokenExpired: boolean;
+  lastSyncedAt: string | null;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+  reconnectionNotifiedAt: string | null;
+};
 type Me = {
   user: {
     id: string;
@@ -33,6 +54,16 @@ type Me = {
   }[];
   children: Child[];
   student: { id: string; name: string; grade: number } | null;
+  zoomAccount?: ZoomAccountState;
+};
+type ZoomMeetingInfo = {
+  id: string;
+  sessionId: string;
+  zoomMeetingId: string;
+  status: string;
+  waitingRoom: boolean;
+  autoRecording: string;
+  syncError: string | null;
 };
 type Offering = {
   id: string;
@@ -40,6 +71,9 @@ type Offering = {
   status: string;
   priceWon: number;
   capacity: number;
+  isZoomLive?: boolean;
+  zoomWaitingRoom?: boolean;
+  zoomAutoRecording?: string;
   course: {
     title: string;
     subject: string;
@@ -47,8 +81,101 @@ type Offering = {
     gradeMax: number;
     level: string;
   };
-  sessions: { startsAt: string; endsAt: string }[];
+  sessions: {
+    id?: string;
+    startsAt: string;
+    endsAt: string;
+    zoomMeeting?: ZoomMeetingInfo | null;
+    _count?: { attendanceRecords: number; zoomRecordings: number };
+  }[];
   instructors: { userId: string }[];
+};
+type StudentOverview = {
+  student: { id: string; name: string; grade: number };
+  overallAttendanceRate: number;
+  totalParticipatedMinutes: number;
+  enrollments: Array<{
+    enrollmentId: string;
+    status: string;
+    expiresAt: string | null;
+    offering: {
+      id: string;
+      title: string;
+      subject: string;
+      academyName: string;
+      isZoomLive: boolean;
+    };
+    sessions: Array<{
+      id: string;
+      startsAt: string;
+      endsAt: string;
+      zoomMeeting: ZoomMeetingInfo | null;
+      attendance: {
+        status: string;
+        totalSeconds: number;
+        attendanceRate: number;
+      } | null;
+      publicRecordings: Array<{
+        id: string;
+        fileType: string;
+        durationSeconds: number;
+      }>;
+    }>;
+  }>;
+};
+type AdminZoomDashboard = {
+  summary: {
+    connectedInstructorsCount: number;
+    reauthRequiredCount: number;
+    scheduledMeetingsCount: number;
+    syncFailedMeetingsCount: number;
+    needsAdminReviewMeetingsCount: number;
+    failedWebhooksCount: number;
+    totalRecordingsCount: number;
+  };
+  instructorAccounts: Array<{
+    userId: string;
+    instructorEmail: string;
+    account: ZoomAccountState;
+  }>;
+  meetings: Array<{
+    meeting: ZoomMeetingInfo;
+    courseTitle: string;
+    academyName: string;
+    instructorEmail: string;
+    startsAt: string;
+    endsAt: string;
+  }>;
+  attendanceRecords: Array<{
+    id: string;
+    sessionId: string;
+    courseTitle: string;
+    studentId: string;
+    studentName: string;
+    status: string;
+    totalSeconds: number;
+    attendanceRate: number;
+    source: string;
+  }>;
+  webhookEvents: Array<{
+    id: string;
+    eventId: string;
+    eventType: string;
+    status: string;
+    attempts: number;
+    errorMessage: string | null;
+    receivedAt: string;
+  }>;
+  recordings: Array<{
+    id: string;
+    sessionId: string;
+    courseTitle: string;
+    zoomRecordingFileId: string;
+    fileType: string;
+    durationSeconds: number;
+    isPublic: boolean;
+    status: string;
+  }>;
 };
 type Invite = { inviteUrl?: string; delivery?: "sent" | "manual" | "failed" };
 const info: Record<
@@ -128,6 +255,20 @@ const statusText: Record<string, string> = {
   closed: "모집 종료",
   completed: "완료",
   cancelled: "취소",
+};
+const zoomStatusText: Record<string, string> = {
+  connected: "Zoom 연결됨",
+  expired: "토큰 자동갱신 대기",
+  reauth_required: "재연결 필요",
+  disconnected: "연결 해제됨",
+  error: "연결 오류",
+  unlinked: "미연결",
+  scheduled: "Zoom 회의 예약됨",
+  started: "Zoom 실시간 수업 중",
+  ended: "Zoom 수업 종료",
+  cancelled: "Zoom 회의 취소됨",
+  sync_failed: "Zoom 회의 생성 실패",
+  needs_admin_review: "관리자 검토 (재연결 대기)",
 };
 const gradeText = (grade: number) =>
   grade <= 6
@@ -257,6 +398,9 @@ export function LiveWorkspace({
   const [me, setMe] = useState<Me | null>(null);
   const [academies, setAcademies] = useState<Academy[]>([]);
   const [offerings, setOfferings] = useState<Offering[]>([]);
+  const [studentOverview, setStudentOverview] =
+    useState<StudentOverview | null>(null);
+  const [adminZoom, setAdminZoom] = useState<AdminZoomDashboard | null>(null);
   const [academyCursor, setAcademyCursor] = useState<string | null>(null);
   const [offeringCursor, setOfferingCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -266,6 +410,9 @@ export function LiveWorkspace({
   const [failed, setFailed] = useState(false);
   const [invite, setInvite] = useState<Invite | null>(null);
   const [selectedAcademy, setSelectedAcademy] = useState("");
+  const [deliveryType, setDeliveryType] = useState<"standard" | "zoom_live">(
+    "standard",
+  );
   const [academyDraft, setAcademyDraft] = useState<{
     academyId: string | null;
     name: string;
@@ -304,6 +451,22 @@ export function LiveWorkspace({
             setOfferings(result.value);
             setOfferingCursor(result.nextCursor ?? null);
           } else setLoadError(errorMessage(result.code));
+        }
+        if (role === "student" && current.value.student) {
+          const stResult = await api<StudentOverview>(
+            "/api/zoom/student",
+            undefined,
+            signal,
+          );
+          if (stResult.ok) setStudentOverview(stResult.value);
+        }
+        if (role === "admin" && current.value.user.platformAdmin) {
+          const zmResult = await api<AdminZoomDashboard>(
+            "/api/zoom/admin",
+            undefined,
+            signal,
+          );
+          if (zmResult.ok) setAdminZoom(zmResult.value);
         }
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError"))
@@ -351,6 +514,48 @@ export function LiveWorkspace({
       setMessage(
         "연결하지 못했습니다. 작성 내용은 유지됩니다. 잠시 후 다시 시도해 주세요.",
       );
+    } finally {
+      setBusy("");
+    }
+  }
+  async function connectZoomAccount() {
+    if (busy) return;
+    setBusy("zoom-connect");
+    setFailed(false);
+    setMessage("");
+    try {
+      const initResult = await api<{
+        authorizeUrl: string;
+        state: string;
+      }>("/api/zoom/account", { redirectPath: pathname || "/instructor" });
+      if (!initResult.ok) {
+        setFailed(true);
+        setMessage(errorMessage(initResult.code));
+        return;
+      }
+      // If authorizeUrl is a local callback (test/mock environment), complete callback directly
+      const targetUrl = new URL(initResult.value.authorizeUrl);
+      if (targetUrl.pathname === "/api/zoom/oauth/callback") {
+        const code = targetUrl.searchParams.get("code") || "";
+        const state = targetUrl.searchParams.get("state") || "";
+        const cbResult = await api<unknown>("/api/zoom/oauth/callback", {
+          code,
+          state,
+        });
+        if (!cbResult.ok) {
+          setFailed(true);
+          setMessage(errorMessage(cbResult.code));
+          return;
+        }
+        setMessage("Zoom 계정이 안전하게 연결되었습니다.");
+        setLoading(true);
+        await load();
+      } else {
+        window.location.assign(initResult.value.authorizeUrl);
+      }
+    } catch {
+      setFailed(true);
+      setMessage("Zoom OAuth 인증 연결을 시작하지 못했습니다.");
     } finally {
       setBusy("");
     }
@@ -427,6 +632,7 @@ export function LiveWorkspace({
       : [];
   const disabled = Boolean(busy);
   const ready = Boolean(me);
+  const zoomAccount = me?.zoomAccount;
   const showFailure = (text: string) => {
     setFailed(true);
     setMessage(text);
@@ -709,25 +915,155 @@ export function LiveWorkspace({
               {role === "student" && (
                 <>
                   {me.student ? (
-                    <Panel title="나의 학생 프로필">
-                      <h3>{me.student.name}</h3>
-                      <p>
-                        {gradeText(me.student.grade)} · 보호자와 연결된 학생
-                        계정입니다.
-                      </p>
-                      <p className={styles.empty}>
-                        수강 신청과 수업 입장은 다음 단계에서 연결됩니다. 현재
-                        활성 수강권이나 화상수업을 제공하지 않습니다.
-                      </p>
-                      <Link className={styles.secondary} href="/classes">
-                        공개 수업 찾기
-                      </Link>
-                    </Panel>
+                    <>
+                      <Panel title="나의 학생 프로필">
+                        <div className={styles.row}>
+                          <div>
+                            <h3>{me.student.name}</h3>
+                            <p>
+                              {gradeText(me.student.grade)} · 보호자와 연결된
+                              학생 계정입니다.
+                            </p>
+                          </div>
+                          {studentOverview && (
+                            <span className={styles.badge}>
+                              평균 출석률 {studentOverview.overallAttendanceRate}
+                              % · 누적 참여{" "}
+                              {studentOverview.totalParticipatedMinutes}분
+                            </span>
+                          )}
+                        </div>
+                        {studentOverview &&
+                        studentOverview.enrollments.length > 0 ? (
+                          <ul className={styles.list}>
+                            {studentOverview.enrollments.map((item) => (
+                              <li key={item.enrollmentId}>
+                                <div className={styles.row}>
+                                  <div>
+                                    <h3>{item.offering.title}</h3>
+                                    <p>
+                                      {item.offering.academyName} ·{" "}
+                                      {item.offering.isZoomLive
+                                        ? "Zoom 실시간 화상강의"
+                                        : "온라인 수업"}
+                                    </p>
+                                  </div>
+                                  <Link
+                                    className={styles.primary}
+                                    href={`/learn/classes/${item.offering.id}`}
+                                  >
+                                    강의실 입장 및 다시보기 →
+                                  </Link>
+                                </div>
+                                {item.sessions.map((session, sIdx) => (
+                                  <p className={styles.note} key={session.id}>
+                                    {sIdx + 1}회차:{" "}
+                                    {new Intl.DateTimeFormat("ko-KR", {
+                                      timeZone: "Asia/Seoul",
+                                      dateStyle: "medium",
+                                      timeStyle: "short",
+                                    }).format(new Date(session.startsAt))}{" "}
+                                    · 출석:{" "}
+                                    {session.attendance
+                                      ? `${session.attendance.status === "present" ? "출석" : session.attendance.status === "late" ? "지각" : "결석"} (${session.attendance.attendanceRate}%)`
+                                      : "집계 전"}{" "}
+                                    {session.publicRecordings.length > 0
+                                      ? `· 다시보기 ${session.publicRecordings.length}건 제공`
+                                      : ""}
+                                  </p>
+                                ))}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className={styles.empty}>
+                            수강 신청과 수업 입장은 다음 단계에서 연결됩니다.
+                            현재 활성 수강권이나 화상수업을 제공하지 않습니다.
+                          </p>
+                        )}
+                        <Link className={styles.secondary} href="/classes">
+                          공개 수업 찾기
+                        </Link>
+                      </Panel>
+                    </>
                   ) : (
                     <InvitationAccept kind="student" />
                   )}
                 </>
               )}
+              {(role === "owner" || role === "instructor") &&
+                me.memberships.length > 0 && (
+                  <Panel title="내 Zoom 계정 연결">
+                    <div className={styles.row}>
+                      <div>
+                        <h3>
+                          {zoomAccount?.connected
+                            ? `${zoomAccount.displayName || "Zoom 강사"} (${zoomAccount.maskedEmail || zoomAccount.zoomUserId})`
+                            : "연결된 Zoom 계정이 없습니다"}
+                        </h3>
+                        <p>
+                          상태:{" "}
+                          {zoomStatusText[zoomAccount?.status || "unlinked"] ??
+                            zoomAccount?.status}{" "}
+                          {zoomAccount?.connected &&
+                            `· 클라우드 녹화: ${zoomAccount.cloudRecordingAllowed ? "지원 (유료 계정)" : "미지원 (기본 계정)"}`}
+                        </p>
+                      </div>
+                      <span className={styles.badge}>
+                        {zoomStatusText[zoomAccount?.status || "unlinked"]}
+                      </span>
+                    </div>
+                    {zoomAccount?.lastErrorMessage && (
+                      <div className={styles.warning} role="alert">
+                        <strong>Zoom 연동 안내</strong>
+                        <p>{zoomAccount.lastErrorMessage}</p>
+                      </div>
+                    )}
+                    <div className={styles.actions}>
+                      {!zoomAccount?.connected ? (
+                        <button
+                          type="button"
+                          className={styles.primary}
+                          disabled={disabled}
+                          onClick={() => void connectZoomAccount()}
+                        >
+                          {busy === "zoom-connect"
+                            ? "Zoom 연결 중…"
+                            : zoomAccount?.status === "disconnected" ||
+                                zoomAccount?.status === "reauth_required"
+                              ? "Zoom 계정 재연결"
+                              : "Zoom 계정 연결"}
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className={styles.secondary}
+                            disabled={disabled}
+                            onClick={() => void connectZoomAccount()}
+                          >
+                            Zoom 계정 재연결
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.secondary}
+                            disabled={disabled}
+                            onClick={() =>
+                              void mutate(
+                                "zoom-disconnect",
+                                "/api/zoom/account",
+                                { action: "disconnect" },
+                                "Zoom 계정 연결을 해제했습니다.",
+                              )
+                            }
+                          >
+                            Zoom 계정 연결 해제
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </Panel>
+                )}
               {role === "owner" && (
                 <>
                   {section === "finance" || section === "students" ? (
@@ -1001,6 +1337,8 @@ export function LiveWorkspace({
                                   );
                                   return;
                                 }
+                                const isZoom =
+                                  data.get("deliveryType") === "zoom_live";
                                 void mutate(
                                   "offering",
                                   "/api/offerings",
@@ -1018,6 +1356,18 @@ export function LiveWorkspace({
                                     instructorIds: [
                                       String(data.get("instructorId")),
                                     ],
+                                    ...(isZoom
+                                      ? {
+                                          isZoomLive: true,
+                                          zoomWaitingRoom:
+                                            data.get("zoomWaitingRoom") ===
+                                            "true",
+                                          zoomAutoRecording: String(
+                                            data.get("zoomAutoRecording") ||
+                                              "none",
+                                          ),
+                                        }
+                                      : {}),
                                     sessions: [
                                       {
                                         startsAt: startsAt.toISOString(),
@@ -1025,7 +1375,9 @@ export function LiveWorkspace({
                                       },
                                     ],
                                   },
-                                  "수업 초안을 등록했습니다. 공개 전 내용을 확인해 주세요.",
+                                  isZoom
+                                    ? "Zoom 라이브 수업 초안 등록 및 회의 연동을 처리했습니다."
+                                    : "수업 초안을 등록했습니다. 공개 전 내용을 확인해 주세요.",
                                   () => form.reset(),
                                 );
                               }}
@@ -1034,6 +1386,78 @@ export function LiveWorkspace({
                                 수업 이름
                                 <input name="title" maxLength={150} required />
                               </label>
+                              <label>
+                                강의 방식
+                                <select
+                                  name="deliveryType"
+                                  value={deliveryType}
+                                  onChange={(e) =>
+                                    setDeliveryType(
+                                      e.target.value as
+                                        | "standard"
+                                        | "zoom_live",
+                                    )
+                                  }
+                                >
+                                  <option value="standard">
+                                    기본 온라인 수업
+                                  </option>
+                                  <option value="zoom_live">
+                                    Zoom 실시간 화상강의
+                                  </option>
+                                </select>
+                              </label>
+                              {deliveryType === "zoom_live" && (
+                                <div className={styles.panel}>
+                                  <h3>Zoom 라이브 강의 설정</h3>
+                                  <p>
+                                    Zoom 계정 연결 상태:{" "}
+                                    <strong>
+                                      {zoomStatusText[
+                                        zoomAccount?.status || "unlinked"
+                                      ]}
+                                    </strong>
+                                  </p>
+                                  {!zoomAccount?.connected && (
+                                    <button
+                                      type="button"
+                                      className={styles.secondary}
+                                      disabled={disabled}
+                                      onClick={() => void connectZoomAccount()}
+                                    >
+                                      Zoom 계정 연결하기
+                                    </button>
+                                  )}
+                                  <div className={styles.columns}>
+                                    <label>
+                                      Zoom 대기실 사용 여부
+                                      <select
+                                        name="zoomWaitingRoom"
+                                        defaultValue="true"
+                                      >
+                                        <option value="true">
+                                          대기실 사용 (권장)
+                                        </option>
+                                        <option value="false">
+                                          대기실 미사용
+                                        </option>
+                                      </select>
+                                    </label>
+                                    <label>
+                                      수업 자동 녹화 여부
+                                      <select
+                                        name="zoomAutoRecording"
+                                        defaultValue="none"
+                                      >
+                                        <option value="none">녹화 안 함</option>
+                                        <option value="cloud">
+                                          Zoom 클라우드 자동 녹화
+                                        </option>
+                                      </select>
+                                    </label>
+                                  </div>
+                                </div>
+                              )}
                               <label>
                                 담당 강사
                                 <select
@@ -1186,6 +1610,9 @@ export function LiveWorkspace({
                                   {offering.priceWon.toLocaleString("ko-KR")}원
                                   · 정원 {offering.capacity}명 ·{" "}
                                   {offering.sessions.length}회
+                                  {offering.isZoomLive
+                                    ? " · Zoom 실시간 강의"
+                                    : ""}
                                 </p>
                               </div>
                               <span className={styles.badge}>
@@ -1197,34 +1624,69 @@ export function LiveWorkspace({
                               {gradeText(offering.course.gradeMax)}
                             </p>
                             {offering.sessions.map((session, index) => (
-                              <p className={styles.note} key={session.startsAt}>
-                                {index + 1}회:{" "}
-                                {new Intl.DateTimeFormat("ko-KR", {
-                                  timeZone: "Asia/Seoul",
-                                  dateStyle: "medium",
-                                  timeStyle: "short",
-                                }).format(new Date(session.startsAt))}{" "}
-                                (Asia/Seoul)
-                              </p>
+                              <div key={session.startsAt}>
+                                <p className={styles.note}>
+                                  {index + 1}회:{" "}
+                                  {new Intl.DateTimeFormat("ko-KR", {
+                                    timeZone: "Asia/Seoul",
+                                    dateStyle: "medium",
+                                    timeStyle: "short",
+                                  }).format(new Date(session.startsAt))}{" "}
+                                  (Asia/Seoul)
+                                  {session.zoomMeeting
+                                    ? ` · ${zoomStatusText[session.zoomMeeting.status] ?? session.zoomMeeting.status}${session.zoomMeeting.zoomMeetingId ? ` (#${session.zoomMeeting.zoomMeetingId})` : ""}`
+                                    : ""}
+                                </p>
+                                {session.zoomMeeting?.syncError && (
+                                  <p className={styles.note}>
+                                    안내: {session.zoomMeeting.syncError}
+                                  </p>
+                                )}
+                              </div>
                             ))}
-                            {role === "owner" &&
-                              offering.status === "draft" && (
+                            <div className={styles.actions}>
+                              {role === "owner" &&
+                                offering.status === "draft" && (
+                                  <button
+                                    type="button"
+                                    className={styles.primary}
+                                    disabled={disabled}
+                                    onClick={() =>
+                                      void mutate(
+                                        `publish-${offering.id}`,
+                                        `/api/offerings/${offering.id}/publish`,
+                                        {},
+                                        "수업이 공개되었습니다.",
+                                      )
+                                    }
+                                  >
+                                    수업 공개
+                                  </button>
+                                )}
+                              {offering.status !== "cancelled" && (
                                 <button
                                   type="button"
-                                  className={styles.primary}
+                                  className={styles.secondary}
                                   disabled={disabled}
                                   onClick={() =>
                                     void mutate(
-                                      `publish-${offering.id}`,
-                                      `/api/offerings/${offering.id}/publish`,
+                                      `zoom-sync-${offering.id}`,
+                                      `/api/offerings/${offering.id}/zoom-sync`,
                                       {},
-                                      "수업이 공개되었습니다.",
+                                      "Zoom 회의 동기화를 완료했습니다.",
                                     )
                                   }
                                 >
-                                  수업 공개
+                                  Zoom 회의 동기화
                                 </button>
                               )}
+                              <Link
+                                className={styles.secondary}
+                                href={`/instructor/classes/${offering.id}`}
+                              >
+                                강의실·출석·녹화 관리
+                              </Link>
+                            </div>
                             {offering.status === "published" && (
                               <Link
                                 className={styles.manualLink}
@@ -1403,6 +1865,101 @@ export function LiveWorkspace({
                             </button>
                           </form>
                         </Panel>
+                        {adminZoom && (
+                          <Panel title="Zoom 화상강의 통합 운영 현황">
+                            <div className={styles.statusSummary}>
+                              <span>
+                                연결 강사:{" "}
+                                {adminZoom.summary.connectedInstructorsCount}명
+                              </span>
+                              <span>
+                                재인증 필요:{" "}
+                                {adminZoom.summary.reauthRequiredCount}명
+                              </span>
+                              <span>
+                                예약·진행 회의:{" "}
+                                {adminZoom.summary.scheduledMeetingsCount}건
+                              </span>
+                              <span>
+                                동기화 오류·검토:{" "}
+                                {adminZoom.summary.syncFailedMeetingsCount +
+                                  adminZoom.summary
+                                    .needsAdminReviewMeetingsCount}
+                                건
+                              </span>
+                              <span>
+                                실패 웹훅:{" "}
+                                {adminZoom.summary.failedWebhooksCount}건
+                              </span>
+                              <span>
+                                녹화 파일:{" "}
+                                {adminZoom.summary.totalRecordingsCount}건
+                              </span>
+                            </div>
+                            {adminZoom.summary.failedWebhooksCount > 0 && (
+                              <div className={styles.actions}>
+                                <button
+                                  type="button"
+                                  className={styles.secondary}
+                                  disabled={disabled}
+                                  onClick={() =>
+                                    void mutate(
+                                      "retry-webhooks",
+                                      "/api/zoom/admin",
+                                      { action: "retry_webhooks" },
+                                      "실패한 Zoom Webhook 이벤트를 재처리했습니다.",
+                                    )
+                                  }
+                                >
+                                  실패 Webhook 일괄 재처리
+                                </button>
+                              </div>
+                            )}
+                            {adminZoom.instructorAccounts.length > 0 && (
+                              <ul className={styles.list}>
+                                {adminZoom.instructorAccounts.map((item) => (
+                                  <li key={item.userId}>
+                                    <div className={styles.row}>
+                                      <div>
+                                        <h3>{item.instructorEmail}</h3>
+                                        <p>
+                                          Zoom ID:{" "}
+                                          {item.account.zoomUserId ?? "미연결"}{" "}
+                                          · 상태:{" "}
+                                          {
+                                            zoomStatusText[
+                                              item.account.status
+                                            ]
+                                          }
+                                        </p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        className={styles.secondary}
+                                        disabled={disabled}
+                                        onClick={() =>
+                                          void mutate(
+                                            `reconnect-${item.userId}`,
+                                            "/api/zoom/admin",
+                                            {
+                                              action: "reconnect_notice",
+                                              instructorId: item.userId,
+                                              reason:
+                                                "운영자 점검: 수업 진행을 위해 Zoom 계정을 다시 연결해 주세요.",
+                                            },
+                                            "강사에게 Zoom 계정 재연결 안내를 설정했습니다.",
+                                          )
+                                        }
+                                      >
+                                        재연결 안내 발송
+                                      </button>
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </Panel>
+                        )}
                       </>
                     )}
                   </>

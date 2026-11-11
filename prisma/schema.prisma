@@ -20,6 +20,9 @@ model User {
   assignments           InstructorAssignment[]
   studentInvitations    StudentInvitation[]
   instructorInvitations InstructorInvitation[]
+  zoomAccount           ZoomAccount?
+  zoomOAuthStates       ZoomOAuthState[]
+  zoomMeetings          ZoomMeeting[]
 }
 
 model Academy {
@@ -51,15 +54,17 @@ model AcademyMembership {
 }
 
 model StudentProfile {
-  id            String              @id @default(uuid()) @db.Uuid
-  name          String
-  grade         Int
-  accountUserId String?             @unique @db.Uuid
-  account       User?               @relation(fields: [accountUserId], references: [id], onDelete: Restrict)
-  guardians     GuardianLink[]
-  invitations   StudentInvitation[]
-  enrollments   Enrollment[]
-  createdAt     DateTime            @default(now())
+  id                     String                  @id @default(uuid()) @db.Uuid
+  name                   String
+  grade                  Int
+  accountUserId          String?                 @unique @db.Uuid
+  account                User?                   @relation(fields: [accountUserId], references: [id], onDelete: Restrict)
+  guardians              GuardianLink[]
+  invitations            StudentInvitation[]
+  enrollments            Enrollment[]
+  zoomAttendanceSessions ZoomAttendanceSession[]
+  attendanceRecords      AttendanceRecord[]
+  createdAt              DateTime                @default(now())
 }
 
 model GuardianLink {
@@ -131,12 +136,16 @@ model Offering {
   enrollmentOpensAt  DateTime
   enrollmentClosesAt DateTime
   purchaseLockedAt   DateTime?
+  isZoomLive         Boolean                @default(false)
+  zoomWaitingRoom    Boolean                @default(true)
+  zoomAutoRecording  String                 @default("none")
   createdAt          DateTime               @default(now())
   course             Course                 @relation(fields: [courseId, academyId], references: [id, academyId], onDelete: Restrict)
   academy            Academy                @relation(fields: [academyId], references: [id], onDelete: Restrict)
   sessions           Session[]
   instructors        InstructorAssignment[]
   enrollments        Enrollment[]
+  zoomMeetings       ZoomMeeting[]
 
   @@unique([id, academyId])
   @@index([academyId, status])
@@ -145,12 +154,17 @@ model Offering {
 }
 
 model Session {
-  id         String   @id @default(uuid()) @db.Uuid
-  offeringId String   @db.Uuid
-  academyId  String   @db.Uuid
-  startsAt   DateTime
-  endsAt     DateTime
-  offering   Offering @relation(fields: [offeringId, academyId], references: [id, academyId], onDelete: Restrict)
+  id                     String                  @id @default(uuid()) @db.Uuid
+  offeringId             String                  @db.Uuid
+  academyId              String                  @db.Uuid
+  startsAt               DateTime
+  endsAt                 DateTime
+  offering               Offering                @relation(fields: [offeringId, academyId], references: [id, academyId], onDelete: Restrict)
+  zoomMeeting            ZoomMeeting?
+  zoomAttendanceSessions ZoomAttendanceSession[]
+  attendanceRecords      AttendanceRecord[]
+  zoomRecordings         ZoomRecording[]
+  materials              SessionMaterial[]
 
   @@index([offeringId, academyId])
   @@index([startsAt, endsAt])
@@ -168,12 +182,14 @@ model InstructorAssignment {
 }
 
 model Enrollment {
-  id         String         @id @default(uuid()) @db.Uuid
-  offeringId String         @db.Uuid
-  studentId  String         @db.Uuid
-  status     String         @default("active")
-  offering   Offering       @relation(fields: [offeringId], references: [id], onDelete: Restrict)
-  student    StudentProfile @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  id                String             @id @default(uuid()) @db.Uuid
+  offeringId        String             @db.Uuid
+  studentId         String             @db.Uuid
+  status            String             @default("active")
+  expiresAt         DateTime?
+  offering          Offering           @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  student           StudentProfile     @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  attendanceRecords AttendanceRecord[]
 
   @@unique([offeringId, studentId])
   @@index([studentId, status])
@@ -204,4 +220,196 @@ model RecommendationEvent {
   createdAt    DateTime @default(now())
 
   @@index([actorId, createdAt])
+}
+
+model ZoomAccount {
+  id                     String        @id @default(uuid()) @db.Uuid
+  userId                 String        @unique @db.Uuid
+  zoomUserId             String
+  zoomEmail              String?
+  zoomDisplayName        String?
+  accountType            Int           @default(1)
+  cloudRecordingAllowed  Boolean       @default(false)
+  encryptedAccessToken   String
+  encryptedRefreshToken  String
+  tokenExpiresAt         DateTime
+  scopes                 String        @default("")
+  status                 String        @default("connected")
+  lastErrorCode          String?
+  lastErrorMessage       String?
+  reconnectionNotifiedAt DateTime?
+  lastSyncedAt           DateTime      @default(now())
+  connectedAt            DateTime      @default(now())
+  disconnectedAt         DateTime?
+  updatedAt              DateTime      @updatedAt
+  user                   User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  meetings               ZoomMeeting[]
+
+  @@index([zoomUserId])
+  @@index([status, lastSyncedAt])
+  @@map("zoom_accounts")
+}
+
+model ZoomOAuthState {
+  id           String    @id @default(uuid()) @db.Uuid
+  stateHash    String    @unique
+  userId       String    @db.Uuid
+  redirectPath String    @default("/instructor")
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  user         User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, expiresAt])
+  @@map("zoom_oauth_states")
+}
+
+model ZoomMeeting {
+  id                       String                  @id @default(uuid()) @db.Uuid
+  sessionId                String                  @unique @db.Uuid
+  offeringId               String                  @db.Uuid
+  instructorId             String                  @db.Uuid
+  zoomAccountId            String?                 @db.Uuid
+  zoomMeetingId            String
+  zoomMeetingUuid          String?
+  zoomHostId               String
+  joinUrl                  String
+  encryptedPassword        String?
+  waitingRoom              Boolean                 @default(true)
+  autoRecording            String                  @default("none")
+  status                   String                  @default("scheduled")
+  syncError                String?
+  retryCount               Int                     @default(0)
+  recordingConsentRequired Boolean                 @default(false)
+  startedAt                DateTime?
+  endedAt                  DateTime?
+  cancelledAt              DateTime?
+  lastSyncedAt             DateTime                @default(now())
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
+  session                  Session                 @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  offering                 Offering                @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  instructor               User                    @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  zoomAccount              ZoomAccount?            @relation(fields: [zoomAccountId], references: [id], onDelete: SetNull)
+  attendanceSessions       ZoomAttendanceSession[]
+  recordings               ZoomRecording[]
+
+  @@index([zoomMeetingId])
+  @@index([zoomMeetingUuid])
+  @@index([offeringId, status])
+  @@index([instructorId, status])
+  @@map("zoom_meetings")
+}
+
+model ZoomAttendanceSession {
+  id               String          @id @default(uuid()) @db.Uuid
+  sessionId        String          @db.Uuid
+  studentId        String?         @db.Uuid
+  zoomMeetingRowId String          @db.Uuid
+  zoomMeetingUuid  String
+  participantId    String
+  participantEmail String?
+  participantName  String?
+  mappingStatus    String          @default("mapped")
+  joinTime         DateTime
+  leaveTime        DateTime?
+  durationSeconds  Int             @default(0)
+  isCorrectedOnEnd Boolean         @default(false)
+  joinEventId      String?         @unique
+  leaveEventId     String?         @unique
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  session          Session         @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  student          StudentProfile? @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  zoomMeeting      ZoomMeeting     @relation(fields: [zoomMeetingRowId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId, studentId])
+  @@index([zoomMeetingRowId, participantId])
+  @@index([zoomMeetingUuid, participantId])
+  @@map("zoom_attendance_sessions")
+}
+
+model AttendanceRecord {
+  id                     String         @id @default(uuid()) @db.Uuid
+  sessionId              String         @db.Uuid
+  studentId              String         @db.Uuid
+  enrollmentId           String?        @db.Uuid
+  totalSeconds           Int            @default(0)
+  sessionDurationSeconds Int            @default(0)
+  attendanceRate         Float          @default(0)
+  status                 String         @default("pending")
+  source                 String         @default("zoom_webhook")
+  firstJoinedAt          DateTime?
+  lastLeftAt             DateTime?
+  calculatedAt           DateTime       @default(now())
+  manualReason           String?
+  updatedById            String?        @db.Uuid
+  session                Session        @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  student                StudentProfile @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  enrollment             Enrollment?    @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, studentId])
+  @@index([studentId, status])
+  @@map("attendance_records")
+}
+
+model ZoomRecording {
+  id                     String      @id @default(uuid()) @db.Uuid
+  sessionId              String      @db.Uuid
+  zoomMeetingRowId       String      @db.Uuid
+  zoomMeetingUuid        String
+  zoomRecordingFileId    String      @unique
+  fileType               String
+  recordingType          String?
+  fileSize               Int         @default(0)
+  encryptedPlayUrl       String?
+  encryptedDownloadUrl   String?
+  recordingStart         DateTime?
+  recordingEnd           DateTime?
+  durationSeconds        Int         @default(0)
+  isPublic               Boolean     @default(false)
+  consentNoticeConfirmed Boolean     @default(true)
+  status                 String      @default("completed")
+  approvedById           String?     @db.Uuid
+  approvedAt             DateTime?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+  session                Session     @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  zoomMeeting            ZoomMeeting @relation(fields: [zoomMeetingRowId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId, isPublic, status])
+  @@index([zoomMeetingUuid])
+  @@map("zoom_recordings")
+}
+
+model ZoomWebhookEvent {
+  id           String    @id @default(uuid()) @db.Uuid
+  eventId      String    @unique
+  eventType    String
+  eventTs      BigInt
+  payload      String
+  status       String    @default("pending")
+  attempts     Int       @default(0)
+  errorMessage String?
+  receivedAt   DateTime  @default(now())
+  processedAt  DateTime?
+
+  @@index([status, receivedAt])
+  @@index([eventType, receivedAt])
+  @@map("zoom_webhook_events")
+}
+
+model SessionMaterial {
+  id          String   @id @default(uuid()) @db.Uuid
+  sessionId   String   @db.Uuid
+  title       String
+  description String?
+  fileName    String
+  content     String
+  createdById String   @db.Uuid
+  createdAt   DateTime @default(now())
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId])
+  @@map("session_materials")
 }

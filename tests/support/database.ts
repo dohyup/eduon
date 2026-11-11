@@ -16,11 +16,13 @@ export async function createTestDatabase() {
   try {
     await client.query(`CREATE SCHEMA "${schema}"`);
     await client.query(`SET search_path TO "${schema}"`);
-    const sql = await readFile(
+    for (const migration of [
       "prisma/migrations/0001_identity_catalog/migration.sql",
-      "utf8",
-    );
-    await client.query(sql.replaceAll('"public".', `"${schema}".`));
+      "prisma/migrations/0002_zoom_integration/migration.sql",
+    ]) {
+      const sql = await readFile(migration, "utf8");
+      await client.query(sql.replaceAll('"public".', `"${schema}".`));
+    }
   } catch (e) {
     await client.end();
     throw e;

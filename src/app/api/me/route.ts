@@ -1,10 +1,11 @@
 import { handle, asOutcome } from "@/server/http";
 import { requireActor } from "@/modules/identity/access";
+import { formatSanitizedZoomAccount } from "@/modules/zoom/account";
 export function GET(request: Request) {
   return handle(request, (ctx) =>
     asOutcome(async () => {
       const user = await requireActor(ctx);
-      const [memberships, links, student] = await Promise.all([
+      const [memberships, links, student, zoomRow] = await Promise.all([
         ctx.db.academyMembership.findMany({
           where: { userId: user.id, active: true },
           include: { academy: true },
@@ -14,6 +15,7 @@ export function GET(request: Request) {
           include: { student: true },
         }),
         ctx.db.studentProfile.findUnique({ where: { accountUserId: user.id } }),
+        ctx.db.zoomAccount.findUnique({ where: { userId: user.id } }),
       ]);
       const instructors = await ctx.db.academyMembership.findMany({
         where: {
@@ -48,6 +50,7 @@ export function GET(request: Request) {
         memberships,
         children: links.map((l) => l.student),
         student,
+        zoomAccount: formatSanitizedZoomAccount(zoomRow, ctx.now()),
       };
     }),
   );

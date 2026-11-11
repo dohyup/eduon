@@ -11,6 +11,7 @@ export type SearchInput = {
 export type PublicOffering = {
   academyName?: string;
   academyRegion?: string;
+  instructorName?: string;
   id: string;
   academyId: string;
   title: string;
@@ -20,7 +21,15 @@ export type PublicOffering = {
   level: Level;
   priceWon: number;
   availableSeats: number;
-  sessions: { id: string; startsAt: string; endsAt: string }[];
+  isZoomLive?: boolean;
+  zoomWaitingRoom?: boolean;
+  zoomAutoRecording?: string;
+  sessions: {
+    id: string;
+    startsAt: string;
+    endsAt: string;
+    zoomStatus?: string | null;
+  }[];
 };
 export type SearchResult = {
   items: PublicOffering[];

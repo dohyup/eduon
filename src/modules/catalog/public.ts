@@ -45,7 +45,10 @@ export async function getPublicOffering(
     include: {
       course: true,
       academy: { select: { name: true, region: true } },
-      sessions: { orderBy: { startsAt: "asc" } },
+      sessions: {
+        orderBy: { startsAt: "asc" },
+        include: { zoomMeeting: { select: { status: true } } },
+      },
       _count: { select: { enrollments: { where: { status: "active" } } } },
     },
   });
@@ -62,10 +65,14 @@ export async function getPublicOffering(
     level: row.course.level as PublicOffering["level"],
     priceWon: row.priceWon,
     availableSeats: Math.max(0, row.capacity - row._count.enrollments),
+    isZoomLive: row.isZoomLive,
+    zoomWaitingRoom: row.zoomWaitingRoom,
+    zoomAutoRecording: row.zoomAutoRecording,
     sessions: row.sessions.map((s) => ({
       id: s.id,
       startsAt: s.startsAt.toISOString(),
       endsAt: s.endsAt.toISOString(),
+      zoomStatus: s.zoomMeeting?.status ?? null,
     })),
   };
 }

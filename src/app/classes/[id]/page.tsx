@@ -28,6 +28,7 @@ export default async function Detail({
             <span className="badge">
               {o.subject === "math" ? "수학" : "영어"} ·{" "}
               {gradeLabel(o.gradeMin)}–{gradeLabel(o.gradeMax)}
+              {o.isZoomLive ? " · Zoom 라이브 강의" : ""}
             </span>
             <h1>{o.title}</h1>
             <p className="muted">
@@ -42,7 +43,7 @@ export default async function Detail({
           <div className="detail-facts">
             <span>
               <Video size={20} />
-              실시간 온라인
+              {o.isZoomLive ? "Zoom 실시간 화상강의" : "실시간 온라인"}
             </span>
             <span>
               <Clock3 size={20} />
@@ -87,6 +88,37 @@ export default async function Detail({
                 </div>
               </div>
             ))}
+          </div>
+          <div className="panel">
+            <h2>회차별 수업 일정 및 실시간 입장 안내</h2>
+            <p className="muted">
+              수업 시작 10분 전부터 수강권 확인 후 실시간 Zoom 강의실에 입장할
+              수 있으며, 시작 전에는 대기 화면이 제공됩니다.
+            </p>
+            <ul className="check-list">
+              {o.sessions.map((s, idx) => (
+                <li key={s.id}>
+                  <Clock3 size={18} />
+                  {idx + 1}회차:{" "}
+                  {new Intl.DateTimeFormat("ko-KR", {
+                    timeZone: "Asia/Seoul",
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(new Date(s.startsAt))}{" "}
+                  (한국시간)
+                  {s.zoomStatus === "started"
+                    ? " · 실시간 진행 중"
+                    : s.zoomStatus === "ended"
+                      ? " · 종료 (다시보기 지원)"
+                      : " · 수업 전 대기"}
+                </li>
+              ))}
+            </ul>
+            {!demo && (
+              <Link className="text-link" href={`/learn/classes/${o.id}`}>
+                수강생 라이브 강의실 입장 확인 →
+              </Link>
+            )}
           </div>
           <div className="panel">
             <h2>신청 전에 확인해주세요</h2>

@@ -60,7 +60,7 @@ try {
         const result = await client.query(
           `SELECT count(*) FROM "${schema}"."_prisma_migrations" WHERE finished_at IS NOT NULL`,
         );
-        if (result.rows[0].count !== "1")
+        if (Number(result.rows[0].count) < 2)
           throw new Error("MIGRATION_NOT_APPLIED");
         console.log("Isolated Prisma migration verified");
       }

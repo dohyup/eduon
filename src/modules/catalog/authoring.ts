@@ -5,6 +5,10 @@ import type { ServiceContext } from "@/server/context";
 import { attempt, ensure } from "@/server/errors";
 import { requireActor } from "@/modules/identity/access";
 import { lockAcademy, requireAcademyOwner } from "@/modules/academies/service";
+import {
+  syncOfferingZoomMeetingsInternal,
+  toZoomMeetingSummary,
+} from "@/modules/zoom/meetings";
 
 const offeringInput = z
   .object({
@@ -19,6 +23,9 @@ const offeringInput = z
     enrollmentOpensAt: z.iso.datetime({ offset: true }),
     enrollmentClosesAt: z.iso.datetime({ offset: true }),
     instructorIds: z.array(z.uuid()).min(1).max(20),
+    isZoomLive: z.boolean().optional(),
+    zoomWaitingRoom: z.boolean().optional(),
+    zoomAutoRecording: z.enum(["none", "cloud", "local"]).optional(),
     sessions: z
       .array(
         z.object({
@@ -107,7 +114,7 @@ export function createOffering(
   return attempt(async () => {
     await requireActor(ctx);
     const data = offeringInput.parse(input);
-    return ctx.db.$transaction(async (tx) => {
+    const created = await ctx.db.$transaction(async (tx) => {
       await lockAcademy(tx, data.academyId);
       await requireAcademyOwner(tx, ctx.actor.userId, data.academyId);
       await lockInstructors(tx, data.instructorIds);
@@ -121,6 +128,9 @@ export function createOffering(
           capacity: data.capacity,
           enrollmentOpensAt: new Date(data.enrollmentOpensAt),
           enrollmentClosesAt: new Date(data.enrollmentClosesAt),
+          isZoomLive: data.isZoomLive ?? false,
+          zoomWaitingRoom: data.zoomWaitingRoom ?? true,
+          zoomAutoRecording: data.zoomAutoRecording ?? "none",
           instructors: {
             create: data.instructorIds.map((userId) => ({ userId })),
           },
@@ -137,6 +147,15 @@ export function createOffering(
       });
       return { offeringId: offering.id };
     });
+
+    if (data.isZoomLive) {
+      const zoomSync = await syncOfferingZoomMeetingsInternal(
+        ctx,
+        created.offeringId,
+      );
+      return { offeringId: created.offeringId, zoomSync };
+    }
+    return created;
   });
 }
 
@@ -149,13 +168,13 @@ export function updateOffering(
     await requireActor(ctx);
     z.uuid().parse(offeringId);
     const data = offeringInput.parse(input);
-    return ctx.db.$transaction(async (tx) => {
+    const result = await ctx.db.$transaction(async (tx) => {
       await lockAcademy(tx, data.academyId);
       await requireAcademyOwner(tx, ctx.actor.userId, data.academyId);
       const current = await tx.offering.findUnique({
         where: { id: offeringId },
         include: {
-          sessions: true,
+          sessions: { orderBy: { startsAt: "asc" } },
           instructors: true,
           _count: { select: { enrollments: { where: { status: "active" } } } },
         },
@@ -186,6 +205,47 @@ export function updateOffering(
       await verifyInstructors(tx, data.academyId, data.instructorIds);
       // A fresh course revision avoids changing another cohort sharing this course.
       const course = await tx.course.create({ data: courseData(data) });
+
+      const nextIsZoomLive = data.isZoomLive ?? current.isZoomLive;
+      const nextWaitingRoom = data.zoomWaitingRoom ?? current.zoomWaitingRoom;
+      const nextAutoRecording =
+        data.zoomAutoRecording ??
+        (current.zoomAutoRecording as "none" | "cloud" | "local");
+
+      if (!current.purchaseLockedAt) {
+        const incomingSessions = sessionData(data);
+        const commonCount = Math.min(
+          current.sessions.length,
+          incomingSessions.length,
+        );
+        for (let i = 0; i < commonCount; i++) {
+          await tx.session.update({
+            where: { id: current.sessions[i].id },
+            data: incomingSessions[i],
+          });
+        }
+        if (incomingSessions.length > current.sessions.length) {
+          await tx.session.createMany({
+            data: incomingSessions.slice(commonCount).map((s) => ({
+              offeringId,
+              academyId: data.academyId,
+              startsAt: s.startsAt,
+              endsAt: s.endsAt,
+            })),
+          });
+        } else if (current.sessions.length > incomingSessions.length) {
+          const removedIds = current.sessions
+            .slice(commonCount)
+            .map((s) => s.id);
+          await tx.zoomMeeting.deleteMany({
+            where: { sessionId: { in: removedIds } },
+          });
+          await tx.session.deleteMany({
+            where: { id: { in: removedIds } },
+          });
+        }
+      }
+
       await tx.offering.update({
         where: { id: offeringId },
         data: {
@@ -194,9 +254,9 @@ export function updateOffering(
           capacity: data.capacity,
           enrollmentOpensAt: new Date(data.enrollmentOpensAt),
           enrollmentClosesAt: new Date(data.enrollmentClosesAt),
-          ...(current.purchaseLockedAt
-            ? {}
-            : { sessions: { deleteMany: {}, create: sessionData(data) } }),
+          isZoomLive: nextIsZoomLive,
+          zoomWaitingRoom: nextWaitingRoom,
+          zoomAutoRecording: nextAutoRecording,
           instructors: {
             deleteMany: {},
             create: data.instructorIds.map((userId) => ({ userId })),
@@ -211,8 +271,16 @@ export function updateOffering(
           createdAt: ctx.now(),
         },
       });
-      return { offeringId };
+      return { offeringId, shouldSyncZoom: nextIsZoomLive };
     });
+
+    if (result.shouldSyncZoom) {
+      const zoomSync = await syncOfferingZoomMeetingsInternal(ctx, offeringId);
+      if (data.isZoomLive !== undefined) {
+        return { offeringId, zoomSync };
+      }
+    }
+    return { offeringId };
   });
 }
 
@@ -220,7 +288,7 @@ export function publishOffering(ctx: ServiceContext, offeringId: string) {
   return attempt(async () => {
     await requireActor(ctx);
     z.uuid().parse(offeringId);
-    await ctx.db.$transaction(async (tx) => {
+    const shouldSyncZoom = await ctx.db.$transaction(async (tx) => {
       const resource = await tx.offering.findUnique({
         where: { id: offeringId },
         select: { academyId: true },
@@ -286,7 +354,12 @@ export function publishOffering(ctx: ServiceContext, offeringId: string) {
           createdAt: ctx.now(),
         },
       });
+      return offering.isZoomLive;
     });
+
+    if (shouldSyncZoom) {
+      await syncOfferingZoomMeetingsInternal(ctx, offeringId);
+    }
   });
 }
 
@@ -317,7 +390,18 @@ export function listManagedOfferings(ctx: ServiceContext, cursor?: string) {
       },
       include: {
         course: true,
-        sessions: { orderBy: { startsAt: "asc" } },
+        sessions: {
+          orderBy: { startsAt: "asc" },
+          include: {
+            zoomMeeting: true,
+            _count: {
+              select: {
+                attendanceRecords: true,
+                zoomRecordings: true,
+              },
+            },
+          },
+        },
         instructors: {
           include: { instructor: { select: { id: true, email: true } } },
         },
@@ -327,6 +411,12 @@ export function listManagedOfferings(ctx: ServiceContext, cursor?: string) {
     });
     return offerings.map((offering) => ({
       ...offering,
+      sessions: offering.sessions.map((s) => ({
+        ...s,
+        zoomMeeting: s.zoomMeeting
+          ? toZoomMeetingSummary(s.zoomMeeting)
+          : null,
+      })),
       instructors: offering.instructors.map((assignment) => ({
         ...assignment,
         instructor: {
