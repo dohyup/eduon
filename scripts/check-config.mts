@@ -19,6 +19,9 @@ console.log(
   `신규 가입: ${process.env.AUTH_ALLOW_SIGNUP === "true" && process.env.PRIVACY_POLICY_VERSION ? "활성화 구성" : "비활성화"}`,
 );
 console.log(
+  `관리자 자동 지정 이메일(ADMIN_EMAILS): ${process.env.ADMIN_EMAILS || process.env.SUPABASE_ADMIN_EMAILS ? "설정됨" : "미설정"}`,
+);
+console.log(
   `Zoom OAuth: ${process.env.ZOOM_CLIENT_ID && process.env.ZOOM_CLIENT_SECRET && process.env.ZOOM_TOKEN_ENCRYPTION_KEY ? "설정됨" : "미설정"}`,
 );
 console.log(

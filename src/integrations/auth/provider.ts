@@ -3,7 +3,12 @@ import "server-only";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { getDatabase } from "@/server/db";
-import { authConfigured, isDemoMode, isTestAuthEnabled } from "@/server/config";
+import {
+  authConfigured,
+  isConfiguredAdminEmail,
+  isDemoMode,
+  isTestAuthEnabled,
+} from "@/server/config";
 import { verifyTestSession } from "./test-session";
 export async function createAuthClient() {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_PUBLISHABLE_KEY)
@@ -56,10 +61,26 @@ export async function getActor() {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user?.email || !data.user.email_confirmed_at) return null;
   const identity = data.user;
+  const normalizedEmail = identity.email!.toLowerCase();
+  const appMeta = (identity.app_metadata ?? {}) as Record<string, unknown>;
+  const isSupabaseMetaAdmin =
+    appMeta.role === "admin" ||
+    appMeta.role === "platform_admin" ||
+    appMeta.platform_admin === true ||
+    appMeta.platformAdmin === true;
+  const shouldGrantAdmin =
+    isConfiguredAdminEmail(normalizedEmail) || isSupabaseMetaAdmin;
   const user = await db.user.upsert({
     where: { id: identity.id },
-    create: { id: identity.id, email: identity.email!.toLowerCase() },
-    update: { email: identity.email!.toLowerCase() },
+    create: {
+      id: identity.id,
+      email: normalizedEmail,
+      ...(shouldGrantAdmin ? { platformAdmin: true } : {}),
+    },
+    update: {
+      email: normalizedEmail,
+      ...(shouldGrantAdmin ? { platformAdmin: true } : {}),
+    },
   });
   return !user.disabledAt ? { userId: user.id } : null;
 }

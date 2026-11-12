@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import styles from "./live-workspace.module.css";
@@ -14,12 +15,58 @@ export function AuthPanel({
   configured: boolean;
   signupAllowed?: boolean;
 }) {
+  const router = useRouter();
+  const [loginMethod, setLoginMethod] = useState<"password" | "otp">(
+    "password",
+  );
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [failed, setFailed] = useState(false);
   const signupBlocked = mode === "signup" && !signupAllowed;
-  async function submit(event: FormEvent<HTMLFormElement>) {
+
+  async function submitPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy || !configured) return;
+    setBusy(true);
+    setMessage("");
+    setFailed(false);
+    try {
+      const response = await fetch("/api/auth/password", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier: identifier.trim(),
+          password,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        setFailed(true);
+        setMessage(
+          result.code === "UNAUTHENTICATED"
+            ? "아이디(또는 이메일)나 비밀번호가 일치하지 않습니다."
+            : result.code === "RATE_LIMITED"
+              ? "로그인 시도가 많습니다. 잠시 후 다시 시도해 주세요."
+              : "로그인 처리를 완료하지 못했습니다. 설정 상태를 확인해 주세요.",
+        );
+      } else {
+        setMessage("로그인되었습니다. 이동 중…");
+        router.push(result.value?.redirectPath || "/admin");
+        router.refresh();
+      }
+    } catch {
+      setFailed(true);
+      setMessage("연결에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitOtp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || !configured || signupBlocked) return;
     setBusy(true);
@@ -57,6 +104,7 @@ export function AuthPanel({
       setBusy(false);
     }
   }
+
   return (
     <main id="main-content" className="container">
       <section className={styles.auth}>
@@ -67,11 +115,80 @@ export function AuthPanel({
             : "나의 배움을 이어가세요"}
         </h1>
         <p>
-          이메일로 받은 보안 링크를 통해 로그인합니다. 비밀번호를 따로
-          입력하거나 저장하지 않습니다.
+          {mode === "login"
+            ? "관리자 아이디/비밀번호 또는 이메일 보안 링크(OTP)로 로그인할 수 있습니다."
+            : "이메일로 받은 보안 링크를 통해 로그인합니다."}
         </p>
-        {configured && !signupBlocked ? (
-          <form onSubmit={submit} className={styles.form}>
+
+        {configured && mode === "login" && (
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={
+                loginMethod === "password" ? styles.primary : styles.secondary
+              }
+              onClick={() => {
+                setLoginMethod("password");
+                setMessage("");
+                setFailed(false);
+              }}
+            >
+              아이디·비밀번호 로그인
+            </button>
+            <button
+              type="button"
+              className={
+                loginMethod === "otp" ? styles.primary : styles.secondary
+              }
+              onClick={() => {
+                setLoginMethod("otp");
+                setMessage("");
+                setFailed(false);
+              }}
+            >
+              이메일 링크(OTP) 로그인
+            </button>
+          </div>
+        )}
+
+        {configured && mode === "login" && loginMethod === "password" ? (
+          <form onSubmit={submitPassword} className={styles.form}>
+            <label htmlFor="auth-identifier">
+              아이디 또는 이메일
+              <input
+                id="auth-identifier"
+                name="identifier"
+                type="text"
+                autoComplete="username"
+                required
+                maxLength={254}
+                value={identifier}
+                onChange={(event) => setIdentifier(event.target.value)}
+                placeholder="admin 또는 admin@eduon.kr"
+                disabled={busy}
+              />
+            </label>
+            <label htmlFor="auth-password">
+              비밀번호
+              <input
+                id="auth-password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                maxLength={128}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="비밀번호 입력"
+                disabled={busy}
+              />
+            </label>
+            <button className={styles.primary} disabled={busy}>
+              {busy ? "로그인 중…" : "로그인"}
+            </button>
+          </form>
+        ) : configured && !signupBlocked ? (
+          <form onSubmit={submitOtp} className={styles.form}>
             <label htmlFor="auth-email">
               이메일 주소
               <input

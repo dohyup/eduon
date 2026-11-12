@@ -401,6 +401,18 @@ export function LiveWorkspace({
   const [studentOverview, setStudentOverview] =
     useState<StudentOverview | null>(null);
   const [adminZoom, setAdminZoom] = useState<AdminZoomDashboard | null>(null);
+  const [adminOperators, setAdminOperators] = useState<{
+    admins: Array<{
+      id: string;
+      email: string;
+      createdAt: string;
+      fromEnvConfig: boolean;
+    }>;
+    configuredEmails: string[];
+  } | null>(null);
+  const [operatorAction, setOperatorAction] = useState<
+    "grant" | "replace" | "revoke"
+  >("grant");
   const [academyCursor, setAcademyCursor] = useState<string | null>(null);
   const [offeringCursor, setOfferingCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -461,12 +473,20 @@ export function LiveWorkspace({
           if (stResult.ok) setStudentOverview(stResult.value);
         }
         if (role === "admin" && current.value.user.platformAdmin) {
-          const zmResult = await api<AdminZoomDashboard>(
-            "/api/zoom/admin",
-            undefined,
-            signal,
-          );
+          const [zmResult, opResult] = await Promise.all([
+            api<AdminZoomDashboard>("/api/zoom/admin", undefined, signal),
+            api<{
+              admins: Array<{
+                id: string;
+                email: string;
+                createdAt: string;
+                fromEnvConfig: boolean;
+              }>;
+              configuredEmails: string[];
+            }>("/api/admin/operators", undefined, signal),
+          ]);
           if (zmResult.ok) setAdminZoom(zmResult.value);
+          if (opResult.ok) setAdminOperators(opResult.value);
         }
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError"))
@@ -1862,6 +1882,135 @@ export function LiveWorkspace({
                               disabled={disabled}
                             >
                               보호자 확인 기록
+                            </button>
+                          </form>
+                        </Panel>
+                        <Panel title="플랫폼 관리자 이메일 지정 및 변경">
+                          <p>
+                            Supabase에 가입·로그인된 이메일 계정에 플랫폼 관리자
+                            권한을 부여하거나 다른 이메일로 변경합니다.{" "}
+                            <code>.env</code>의 <code>ADMIN_EMAILS</code>{" "}
+                            환경변수 또는 Supabase 대시보드{" "}
+                            <code>app_metadata.role=&quot;admin&quot;</code>
+                            으로도 자동 지정할 수 있습니다.
+                          </p>
+                          {adminOperators && (
+                            <div className={styles.note}>
+                              <strong>현재 활성 관리자 목록:</strong>{" "}
+                              {adminOperators.admins.length
+                                ? adminOperators.admins
+                                    .map(
+                                      (a) =>
+                                        `${a.email}${a.fromEnvConfig ? " (환경변수 고정)" : ""}`,
+                                    )
+                                    .join(", ")
+                                : "없음"}
+                            </div>
+                          )}
+                          <form
+                            className={styles.form}
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              const form = event.currentTarget;
+                              const data = new FormData(form);
+                              const action = operatorAction;
+                              const email = String(
+                                data.get("email") || "",
+                              ).trim();
+                              const previousEmail = String(
+                                data.get("previousEmail") || "",
+                              ).trim();
+                              const opReason = String(
+                                data.get("reason") || "",
+                              ).trim();
+                              void mutate(
+                                "admin-operator-mutate",
+                                "/api/admin/operators",
+                                {
+                                  action,
+                                  email,
+                                  ...(action === "replace"
+                                    ? { previousEmail }
+                                    : {}),
+                                  reason: opReason,
+                                },
+                                action === "grant"
+                                  ? `${email} 계정에 관리자 권한을 부여했습니다.`
+                                  : action === "replace"
+                                    ? `관리자 계정을 ${previousEmail}에서 ${email}(으)로 변경했습니다.`
+                                    : `${email} 계정의 관리자 권한을 해제했습니다.`,
+                                () => form.reset(),
+                              );
+                            }}
+                          >
+                            <label>
+                              작업 유형
+                              <select
+                                name="action"
+                                value={operatorAction}
+                                onChange={(e) =>
+                                  setOperatorAction(
+                                    e.target.value as
+                                      | "grant"
+                                      | "replace"
+                                      | "revoke",
+                                  )
+                                }
+                              >
+                                <option value="grant">
+                                  새 관리자 이메일 추가 지정
+                                </option>
+                                <option value="replace">
+                                  기존 관리자 이메일을 새 이메일로 변경(교체)
+                                </option>
+                                <option value="revoke">
+                                  관리자 이메일 권한 해제
+                                </option>
+                              </select>
+                            </label>
+                            {operatorAction === "replace" && (
+                              <label>
+                                기존 관리자 이메일
+                                <input
+                                  name="previousEmail"
+                                  type="email"
+                                  required
+                                  maxLength={254}
+                                  placeholder="old-admin@example.com"
+                                />
+                              </label>
+                            )}
+                            <label>
+                              {operatorAction === "replace"
+                                ? "새 관리자 이메일"
+                                : "대상 이메일 주소"}
+                              <input
+                                name="email"
+                                type="email"
+                                required
+                                maxLength={254}
+                                placeholder="new-admin@example.com"
+                              />
+                            </label>
+                            <label>
+                              변경 사유 (감사 로그 기록)
+                              <input
+                                name="reason"
+                                required
+                                minLength={4}
+                                maxLength={500}
+                                placeholder="운영 담당자 지정 또는 이메일 계정 변경"
+                              />
+                            </label>
+                            <button
+                              className={styles.primary}
+                              disabled={disabled}
+                            >
+                              {operatorAction === "grant"
+                                ? "관리자 권한 부여"
+                                : operatorAction === "replace"
+                                  ? "관리자 이메일 변경"
+                                  : "관리자 권한 해제"}
                             </button>
                           </form>
                         </Panel>
