@@ -164,25 +164,36 @@ export default async function Detail({
             </small>
             <strong>{money(o.priceWon)}</strong>
           </div>
-          <DemoDialog
-            label={demo ? "수강 신청" : "수강 신청 안내"}
-            title={demo ? "데모 신청 안내" : "수강 신청 연동 준비 중"}
-          >
-            <p>
-              {demo
-                ? "선택한 수업은 가상 수업입니다."
-                : "학원이 공개한 수업 정보입니다."}{" "}
-              실제 결제 및 수강 신청은 아직 진행되지 않습니다.
-            </p>
-            <p className="muted">
-              학부모가 자녀와 수업 일정을 확인하고 신청하는 흐름을 미리
-              살펴보세요.
-            </p>
-            <Link className="text-link" href="/parent">
-              학부모 화면으로 →
-            </Link>
-          </DemoDialog>
-          <p className="caption">실제 결제 및 수강 불가</p>
+          {demo ? (
+            <>
+              <DemoDialog label="수강 신청" title="데모 신청 안내">
+                <p>
+                  선택한 수업은 가상 수업입니다. 실제 결제 및 수강 신청은 아직
+                  진행되지 않습니다.
+                </p>
+                <p className="muted">
+                  학부모가 자녀와 수업 일정을 확인하고 신청하는 흐름을 미리
+                  살펴보세요.
+                </p>
+                <Link className="text-link" href="/parent">
+                  학부모 화면으로 →
+                </Link>
+              </DemoDialog>
+              <p className="caption">실제 결제 및 수강 불가</p>
+            </>
+          ) : (
+            <div style={{ display: "grid", gap: "10px" }}>
+              <Link className="button" href={`/learn/classes/${o.id}`}>
+                학생 Zoom 실시간 강의실 입장 →
+              </Link>
+              <Link
+                className="button secondary"
+                href={`/instructor/classes/${o.id}`}
+              >
+                강사 호스트 강의실·출석 관리 →
+              </Link>
+            </div>
+          )}
         </aside>
       </div>
     </main>

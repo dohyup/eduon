@@ -8,8 +8,6 @@ import type { PublicOffering, SearchInput } from "@/contracts/domain";
 export async function listPublicOfferings(input: SearchInput = {}) {
   if (isDemoMode())
     return { ...searchDemoOfferings(input), unavailable: false };
-  if (!process.env.DATABASE_URL)
-    return { items: [], nextCursor: null, unavailable: true };
   try {
     const db = getDatabase();
     const result = await searchOfferings(input, db);
@@ -34,10 +32,7 @@ export async function getPublicOffering(
   id: string,
 ): Promise<PublicOffering | null> {
   if (isDemoMode()) return demoOfferings.find((o) => o.id === id) || null;
-  if (
-    !process.env.DATABASE_URL ||
-    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id)
-  )
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id))
     return null;
   const db = getDatabase();
   const row = await db.offering.findFirst({
@@ -78,10 +73,7 @@ export async function getPublicOffering(
 }
 export async function getPublicAcademy(id: string) {
   if (isDemoMode()) return academies.find((a) => a.id === id) || null;
-  if (
-    !process.env.DATABASE_URL ||
-    !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id)
-  )
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id))
     return null;
   const row = await getDatabase().academy.findFirst({
     where: { id, status: "approved" },

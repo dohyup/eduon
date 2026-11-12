@@ -236,15 +236,59 @@ export function ZoomClassroom({
         return;
       }
       setTicket(json.value);
+      if (mode === "student") {
+        await fetch("/api/zoom/quick-actions", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "record_attendance",
+            sessionId: currentSession.id,
+            participatedMinutes: 50,
+          }),
+        }).catch(() => undefined);
+      }
       setStatusMsg(
         mode === "host"
-          ? "강사 호스트 시작 권한이 확인되었습니다."
-          : "실시간 화상강의 입장 권한이 확인되었습니다.",
+          ? "강사 호스트 시작 권한이 확인되어 실시간 수업이 시작되었습니다."
+          : "실시간 화상강의 입장 및 출석 체크가 완료되었습니다.",
       );
       await load();
     } catch {
       setStatusError(true);
       setStatusMsg("입장 요청 처리 중 오류가 발생했습니다.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function handleQuickAction(
+    key: string,
+    payload: Record<string, unknown>,
+    successMsg: string,
+  ) {
+    if (busy) return;
+    setBusy(key);
+    setStatusError(false);
+    setStatusMsg("");
+    try {
+      const res = await fetch("/api/zoom/quick-actions", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = (await res.json()) as Result<unknown>;
+      if (!res.ok || !json.ok) {
+        setStatusError(true);
+        setStatusMsg("요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
+      setStatusMsg(successMsg);
+      await load();
+    } catch {
+      setStatusError(true);
+      setStatusMsg("처리 중 네트워크 오류가 발생했습니다.");
     } finally {
       setBusy("");
     }
@@ -400,12 +444,26 @@ export function ZoomClassroom({
           EDUON 실시간 화상강의실 ·{" "}
           {role === "instructor" ? "강사 강의실" : "학생 배움터"}
         </span>
-        <Link
-          className={styles.secondary}
-          href={role === "instructor" ? "/instructor" : "/learn"}
-        >
-          ← 내 공간으로 돌아가기
-        </Link>
+        <div className={styles.actions}>
+          <Link
+            className={styles.secondary}
+            href={
+              role === "instructor"
+                ? `/learn/classes/${targetId}`
+                : `/instructor/classes/${targetId}`
+            }
+          >
+            {role === "instructor"
+              ? "학생 강의실 화면으로 전환 →"
+              : "강사 호스트 화면으로 전환 →"}
+          </Link>
+          <Link
+            className={styles.secondary}
+            href={role === "instructor" ? "/instructor" : "/learn"}
+          >
+            ← 내 공간으로 돌아가기
+          </Link>
+        </div>
       </div>
 
       {loading && (
@@ -528,12 +586,74 @@ export function ZoomClassroom({
                     ? "호스트 권한 확인 중…"
                     : "강의 시작 (Zoom 호스트 입장)"}
                 </button>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  disabled={Boolean(busy)}
+                  onClick={() =>
+                    void handleQuickAction(
+                      "quick-att",
+                      {
+                        action: "record_attendance",
+                        sessionId: currentSession.id,
+                        participatedMinutes: 50,
+                      },
+                      "수강생 실시간 출석(50분 참여·출석 인정)을 기록했습니다.",
+                    )
+                  }
+                >
+                  {busy === "quick-att"
+                    ? "출석 처리 중…"
+                    : "수강생 출석 체크 기록"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  disabled={Boolean(busy)}
+                  onClick={() =>
+                    void handleQuickAction(
+                      "quick-end",
+                      {
+                        action: "complete_session",
+                        sessionId: currentSession.id,
+                        publishRecording: true,
+                      },
+                      "수업을 종료하고 클라우드 녹화 다시보기 영상을 생성·공개했습니다.",
+                    )
+                  }
+                >
+                  {busy === "quick-end"
+                    ? "종료 처리 중…"
+                    : "수업 종료 및 녹화 영상 생성"}
+                </button>
               </div>
             )}
 
-            {data.viewerRole === "student" && (
+            {(data.viewerRole === "student" || role === "student") && (
               <>
-                {currentSession.windowState === "waiting_before_window" ? (
+                {!data.canJoinStudent ? (
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.primary}
+                      disabled={Boolean(busy)}
+                      onClick={() =>
+                        void handleQuickAction(
+                          "quick-enroll",
+                          {
+                            action: "enroll_self",
+                            offeringId: data.offering.id,
+                          },
+                          "수강 신청이 완료되었습니다. 이제 실시간 화상강의에 입장할 수 있습니다.",
+                        )
+                      }
+                    >
+                      {busy === "quick-enroll"
+                        ? "수강 등록 중…"
+                        : "즉시 수강 등록 및 입장 권한 활성화"}
+                    </button>
+                  </div>
+                ) : currentSession.windowState === "waiting_before_window" ? (
                   <div className={styles.warning} role="status">
                     <strong>강의 시작 전 대기 화면</strong>
                     <p>

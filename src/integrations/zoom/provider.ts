@@ -5,6 +5,7 @@ import {
   zoomOAuthBaseUrl,
   zoomRedirectUri,
 } from "@/server/config";
+import { getRuntimeSettings } from "@/server/runtime-settings";
 import {
   ZoomApiError,
   type ZoomCreateMeetingInput,
@@ -74,8 +75,10 @@ async function fetchWithRetry(
 }
 
 function basicAuthHeader(): string {
-  const clientId = process.env.ZOOM_CLIENT_ID || "";
-  const clientSecret = process.env.ZOOM_CLIENT_SECRET || "";
+  const settings = getRuntimeSettings();
+  const clientId = settings.zoomClientId || process.env.ZOOM_CLIENT_ID || "";
+  const clientSecret =
+    settings.zoomClientSecret || process.env.ZOOM_CLIENT_SECRET || "";
   if (!clientId || !clientSecret) {
     throw new ZoomApiError(503, "ZOOM_OAUTH_UNCONFIGURED");
   }
@@ -84,7 +87,8 @@ function basicAuthHeader(): string {
 
 class HttpZoomProvider implements ZoomPort {
   buildAuthorizeUrl(state: string): string {
-    const clientId = process.env.ZOOM_CLIENT_ID;
+    const settings = getRuntimeSettings();
+    const clientId = settings.zoomClientId || process.env.ZOOM_CLIENT_ID;
     if (!clientId) throw new ZoomApiError(503, "ZOOM_OAUTH_UNCONFIGURED");
     const url = new URL(`${zoomOAuthBaseUrl()}/authorize`);
     url.searchParams.set("response_type", "code");
@@ -552,10 +556,12 @@ export function setZoomProviderForTests(provider: ZoomPort | null) {
 
 export function getZoomProvider(): ZoomPort {
   if (customProvider) return customProvider;
-  if (
-    isZoomMockEnabled() &&
-    (!process.env.ZOOM_CLIENT_ID || !process.env.ZOOM_CLIENT_SECRET)
-  ) {
+  const settings = getRuntimeSettings();
+  const hasRealCreds = Boolean(
+    (settings.zoomClientId || process.env.ZOOM_CLIENT_ID) &&
+      (settings.zoomClientSecret || process.env.ZOOM_CLIENT_SECRET),
+  );
+  if (isZoomMockEnabled() || !hasRealCreds) {
     return mockProvider;
   }
   return httpProvider;

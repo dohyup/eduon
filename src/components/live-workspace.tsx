@@ -177,6 +177,24 @@ type AdminZoomDashboard = {
     status: string;
   }>;
 };
+type AdminSettingsView = {
+  zoomMode: "simulation" | "live";
+  zoomClientId: string;
+  hasClientSecret: boolean;
+  maskedClientSecret: string;
+  zoomRedirectUri: string;
+  hasWebhookSecret: boolean;
+  maskedWebhookSecret: string;
+  zoomSdkKey: string;
+  hasSdkSecret: boolean;
+  maskedSdkSecret: string;
+  zoomExternalSdkApproved: boolean;
+  adminEmails: string;
+  hasDatabaseUrl: boolean;
+  maskedDatabaseUrl: string;
+  updatedAt: string;
+  updatedByEmail: string | null;
+};
 type Invite = { inviteUrl?: string; delivery?: "sent" | "manual" | "failed" };
 const info: Record<
   Role,
@@ -410,6 +428,8 @@ export function LiveWorkspace({
     }>;
     configuredEmails: string[];
   } | null>(null);
+  const [adminSettings, setAdminSettings] =
+    useState<AdminSettingsView | null>(null);
   const [operatorAction, setOperatorAction] = useState<
     "grant" | "replace" | "revoke"
   >("grant");
@@ -423,7 +443,7 @@ export function LiveWorkspace({
   const [invite, setInvite] = useState<Invite | null>(null);
   const [selectedAcademy, setSelectedAcademy] = useState("");
   const [deliveryType, setDeliveryType] = useState<"standard" | "zoom_live">(
-    "standard",
+    "zoom_live",
   );
   const [academyDraft, setAcademyDraft] = useState<{
     academyId: string | null;
@@ -473,7 +493,7 @@ export function LiveWorkspace({
           if (stResult.ok) setStudentOverview(stResult.value);
         }
         if (role === "admin" && current.value.user.platformAdmin) {
-          const [zmResult, opResult] = await Promise.all([
+          const [zmResult, opResult, stResult] = await Promise.all([
             api<AdminZoomDashboard>("/api/zoom/admin", undefined, signal),
             api<{
               admins: Array<{
@@ -484,9 +504,11 @@ export function LiveWorkspace({
               }>;
               configuredEmails: string[];
             }>("/api/admin/operators", undefined, signal),
+            api<AdminSettingsView>("/api/admin/settings", undefined, signal),
           ]);
           if (zmResult.ok) setAdminZoom(zmResult.value);
           if (opResult.ok) setAdminOperators(opResult.value);
+          if (stResult.ok) setAdminSettings(stResult.value);
         }
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError"))
@@ -691,16 +713,33 @@ export function LiveWorkspace({
         <span>
           나의 EDUON / {meta.name} 공간 {me ? `· ${me.user.email}` : ""}
         </span>
-        {me && (
-          <button
-            type="button"
-            className={styles.secondary}
-            disabled={disabled}
-            onClick={logout}
-          >
-            {busy === "logout" ? "로그아웃 중…" : "로그아웃"}
-          </button>
-        )}
+        <div className={styles.actions}>
+          <Link className={styles.secondary} href="/admin">
+            관리자·Zoom설정
+          </Link>
+          <Link className={styles.secondary} href="/academy">
+            원장·수업개설
+          </Link>
+          <Link className={styles.secondary} href="/instructor">
+            강사·강의실
+          </Link>
+          <Link className={styles.secondary} href="/learn">
+            학생·수업입장
+          </Link>
+          <Link className={styles.secondary} href="/classes">
+            공개 수업목록
+          </Link>
+          {me && (
+            <button
+              type="button"
+              className={styles.secondary}
+              disabled={disabled}
+              onClick={logout}
+            >
+              {busy === "logout" ? "로그아웃 중…" : "로그아웃"}
+            </button>
+          )}
+        </div>
       </div>
       <div className={styles.shell}>
         <nav className={styles.nav} aria-label={`${meta.name} 업무 메뉴`}>
@@ -1543,6 +1582,7 @@ export function LiveWorkspace({
                                   <input
                                     name="priceWon"
                                     type="number"
+                                    defaultValue={120000}
                                     min={0}
                                     max={10000000}
                                     step={1}
@@ -1554,6 +1594,7 @@ export function LiveWorkspace({
                                   <input
                                     name="capacity"
                                     type="number"
+                                    defaultValue={10}
                                     min={1}
                                     max={100}
                                     step={1}
@@ -1565,6 +1606,7 @@ export function LiveWorkspace({
                                   <input
                                     name="opensAt"
                                     type="datetime-local"
+                                    defaultValue="2026-01-01T09:00"
                                     required
                                   />
                                 </label>
@@ -1573,6 +1615,7 @@ export function LiveWorkspace({
                                   <input
                                     name="closesAt"
                                     type="datetime-local"
+                                    defaultValue="2027-12-30T18:00"
                                     required
                                   />
                                 </label>
@@ -1581,6 +1624,7 @@ export function LiveWorkspace({
                                   <input
                                     name="startsAt"
                                     type="datetime-local"
+                                    defaultValue="2027-12-31T10:00"
                                     required
                                   />
                                 </label>
@@ -1589,6 +1633,7 @@ export function LiveWorkspace({
                                   <input
                                     name="endsAt"
                                     type="datetime-local"
+                                    defaultValue="2027-12-31T11:30"
                                     required
                                   />
                                 </label>
@@ -1701,10 +1746,16 @@ export function LiveWorkspace({
                                 </button>
                               )}
                               <Link
-                                className={styles.secondary}
+                                className={styles.primary}
                                 href={`/instructor/classes/${offering.id}`}
                               >
-                                강의실·출석·녹화 관리
+                                강사 강의실·출석·녹화 관리
+                              </Link>
+                              <Link
+                                className={styles.secondary}
+                                href={`/learn/classes/${offering.id}`}
+                              >
+                                학생 강의실 입장 화면
                               </Link>
                             </div>
                             {offering.status === "published" && (
@@ -1752,6 +1803,224 @@ export function LiveWorkspace({
                       </Panel>
                     ) : (
                       <>
+                        <Panel title="Zoom 및 시스템 연동 설정 (DB·관리자 메뉴 설정)">
+                          <p>
+                            환경설정 파일(<code>.env</code>) 수정 없이 이 화면에서
+                            Zoom OAuth·Meeting SDK·Webhook·실행 모드 및 데이터베이스
+                            연결 정보를 설정하고 DB에 저장할 수 있습니다.
+                          </p>
+                          {adminSettings && (
+                            <div className={styles.note}>
+                              <strong>현재 적용 상태:</strong>{" "}
+                              {adminSettings.zoomMode === "simulation"
+                                ? "즉시 실행(시뮬레이션) 모드 — 별도 Zoom 키 입력 없이도 수업 개설·회의 자동생성·호스트/학생 입장·출석·녹화가 즉시 동작합니다."
+                                : "실제 Zoom OAuth/API 연동 모드"}{" "}
+                              · Client Secret:{" "}
+                              {adminSettings.hasClientSecret
+                                ? adminSettings.maskedClientSecret
+                                : "미입력"}{" "}
+                              · Webhook Secret:{" "}
+                              {adminSettings.hasWebhookSecret
+                                ? adminSettings.maskedWebhookSecret
+                                : "기본값 적용됨"}{" "}
+                              · SDK 승인:{" "}
+                              {adminSettings.zoomExternalSdkApproved
+                                ? "활성화"
+                                : "외부 안전입장 기본"}
+                            </div>
+                          )}
+                          <form
+                            className={styles.form}
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              const form = event.currentTarget;
+                              const data = new FormData(form);
+                              void mutate(
+                                "save-admin-settings",
+                                "/api/admin/settings",
+                                {
+                                  zoomMode: String(
+                                    data.get("zoomMode") || "simulation",
+                                  ),
+                                  zoomClientId: String(
+                                    data.get("zoomClientId") || "",
+                                  ).trim(),
+                                  zoomClientSecret: String(
+                                    data.get("zoomClientSecret") || "",
+                                  ).trim(),
+                                  zoomRedirectUri: String(
+                                    data.get("zoomRedirectUri") || "",
+                                  ).trim(),
+                                  zoomWebhookSecret: String(
+                                    data.get("zoomWebhookSecret") || "",
+                                  ).trim(),
+                                  zoomSdkKey: String(
+                                    data.get("zoomSdkKey") || "",
+                                  ).trim(),
+                                  zoomSdkSecret: String(
+                                    data.get("zoomSdkSecret") || "",
+                                  ).trim(),
+                                  zoomExternalSdkApproved:
+                                    data.get("zoomExternalSdkApproved") ===
+                                    "true",
+                                  adminEmails: String(
+                                    data.get("adminEmails") || "",
+                                  ).trim(),
+                                  databaseUrl: String(
+                                    data.get("databaseUrl") || "",
+                                  ).trim(),
+                                },
+                                "Zoom 및 시스템 연동 설정을 DB에 저장하고 즉시 반영했습니다.",
+                              );
+                            }}
+                          >
+                            <div className={styles.columns}>
+                              <label>
+                                Zoom 동작 모드
+                                <select
+                                  name="zoomMode"
+                                  defaultValue={
+                                    adminSettings?.zoomMode ?? "simulation"
+                                  }
+                                >
+                                  <option value="simulation">
+                                    즉시 수업·회의 생성 모드 (시뮬레이션/내장 연동)
+                                  </option>
+                                  <option value="live">
+                                    실제 Zoom Marketplace OAuth/API 연동 모드
+                                  </option>
+                                </select>
+                              </label>
+                              <label>
+                                외부 회의 Meeting SDK 승인 상태 (2026 정책)
+                                <select
+                                  name="zoomExternalSdkApproved"
+                                  defaultValue={
+                                    adminSettings?.zoomExternalSdkApproved
+                                      ? "true"
+                                      : "false"
+                                  }
+                                >
+                                  <option value="false">
+                                    외부 Zoom 앱/브라우저 안전 입장 기본
+                                  </option>
+                                  <option value="true">
+                                    승인 완료 (학생 내장 Component View + 외부 입장 모두 지원)
+                                  </option>
+                                </select>
+                              </label>
+                              <label>
+                                Zoom OAuth Client ID
+                                <input
+                                  name="zoomClientId"
+                                  defaultValue={
+                                    adminSettings?.zoomClientId ?? ""
+                                  }
+                                  placeholder="Zoom App Client ID (실연동 시 입력)"
+                                />
+                              </label>
+                              <label>
+                                Zoom OAuth Client Secret
+                                <input
+                                  name="zoomClientSecret"
+                                  type="password"
+                                  autoComplete="off"
+                                  placeholder={
+                                    adminSettings?.hasClientSecret
+                                      ? `저장됨 (${adminSettings.maskedClientSecret}) · 변경 시에만 입력`
+                                      : "Zoom App Client Secret"
+                                  }
+                                />
+                              </label>
+                              <label>
+                                Zoom OAuth Redirect URI
+                                <input
+                                  name="zoomRedirectUri"
+                                  defaultValue={
+                                    adminSettings?.zoomRedirectUri ?? ""
+                                  }
+                                  placeholder="https://www.eduonlink.com/api/zoom/oauth/callback"
+                                />
+                              </label>
+                              <label>
+                                Zoom Webhook Secret Token
+                                <input
+                                  name="zoomWebhookSecret"
+                                  type="password"
+                                  autoComplete="off"
+                                  placeholder={
+                                    adminSettings?.hasWebhookSecret
+                                      ? `저장됨 (${adminSettings.maskedWebhookSecret}) · 변경 시에만 입력`
+                                      : "Webhook Secret Token"
+                                  }
+                                />
+                              </label>
+                              <label>
+                                Zoom Meeting SDK Key
+                                <input
+                                  name="zoomSdkKey"
+                                  defaultValue={adminSettings?.zoomSdkKey ?? ""}
+                                  placeholder="Zoom Meeting SDK Key"
+                                />
+                              </label>
+                              <label>
+                                Zoom Meeting SDK Secret
+                                <input
+                                  name="zoomSdkSecret"
+                                  type="password"
+                                  autoComplete="off"
+                                  placeholder={
+                                    adminSettings?.hasSdkSecret
+                                      ? `저장됨 (${adminSettings.maskedSdkSecret}) · 변경 시에만 입력`
+                                      : "Zoom Meeting SDK Secret"
+                                  }
+                                />
+                              </label>
+                              <label>
+                                플랫폼 관리자 이메일 목록 (쉼표 구분)
+                                <input
+                                  name="adminEmails"
+                                  defaultValue={
+                                    adminSettings?.adminEmails ??
+                                    "admin@eduon.kr,darkpon@naver.com"
+                                  }
+                                />
+                              </label>
+                              <label>
+                                외부 PostgreSQL 연결 URL (선택 · 미입력 시 내장 런타임 DB 사용)
+                                <input
+                                  name="databaseUrl"
+                                  type="password"
+                                  autoComplete="off"
+                                  placeholder={
+                                    adminSettings?.hasDatabaseUrl
+                                      ? `저장됨 (${adminSettings.maskedDatabaseUrl})`
+                                      : "postgresql://... (미입력 시 내장 DB 자동 동작)"
+                                  }
+                                />
+                              </label>
+                            </div>
+                            <div className={styles.actions}>
+                              <button
+                                className={styles.primary}
+                                disabled={disabled}
+                              >
+                                {busy === "save-admin-settings"
+                                  ? "설정 저장 중…"
+                                  : "설정 저장 (DB 즉시 반영)"}
+                              </button>
+                              <Link className={styles.secondary} href="/academy">
+                                수업 개설·관리(원장 공간)로 이동 →
+                              </Link>
+                              <Link
+                                className={styles.secondary}
+                                href="/instructor"
+                              >
+                                강사 수업·강의실로 이동 →
+                              </Link>
+                            </div>
+                          </form>
+                        </Panel>
                         <Panel title="학원 입점 심사">
                           {academies.length ? (
                             <ul className={styles.list}>
@@ -2106,6 +2375,43 @@ export function LiveWorkspace({
                                   </li>
                                 ))}
                               </ul>
+                            )}
+                            {adminZoom.meetings.length > 0 && (
+                              <>
+                                <h3>개설된 Zoom 실시간 강의 및 강의실 바로가기</h3>
+                                <ul className={styles.list}>
+                                  {adminZoom.meetings.map((m) => (
+                                    <li key={m.meeting.id}>
+                                      <div className={styles.row}>
+                                        <div>
+                                          <h3>{m.courseTitle}</h3>
+                                          <p>
+                                            {m.academyName} · 강사:{" "}
+                                            {m.instructorEmail} · 회의번호: #
+                                            {m.meeting.zoomMeetingId} · 상태:{" "}
+                                            {zoomStatusText[m.meeting.status] ??
+                                              m.meeting.status}
+                                          </p>
+                                        </div>
+                                        <div className={styles.actions}>
+                                          <Link
+                                            className={styles.primary}
+                                            href={`/instructor/classes/${m.meeting.sessionId}`}
+                                          >
+                                            강사 호스트 입장·관리 →
+                                          </Link>
+                                          <Link
+                                            className={styles.secondary}
+                                            href={`/learn/classes/${m.meeting.sessionId}`}
+                                          >
+                                            학생 강의실 입장 →
+                                          </Link>
+                                        </div>
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </>
                             )}
                           </Panel>
                         )}

@@ -7,6 +7,7 @@ import {
   zoomExternalSdkApproved,
   zoomSdkConfigured,
 } from "@/server/config";
+import { getRuntimeSettings } from "@/server/runtime-settings";
 import {
   createZoomSdkSignature,
   decryptZoomSecret,
@@ -169,9 +170,15 @@ export function startZoomSessionByHost(
     });
 
     const sdkReady = zoomSdkConfigured();
-    const sdkKey = process.env.ZOOM_SDK_KEY || "eduon-dev-sdk-key";
+    const runtimeSettings = getRuntimeSettings();
+    const sdkKey =
+      process.env.ZOOM_SDK_KEY ||
+      runtimeSettings.zoomSdkKey ||
+      "eduon-dev-sdk-key";
     const sdkSecret =
-      process.env.ZOOM_SDK_SECRET || "eduon-dev-sdk-secret-32bytes-minimum";
+      process.env.ZOOM_SDK_SECRET ||
+      runtimeSettings.zoomSdkSecret ||
+      "eduon-dev-sdk-secret-32bytes-minimum";
 
     const signature = createZoomSdkSignature({
       sdkKey,
@@ -296,8 +303,13 @@ export function joinZoomSessionByStudent(
 
     let sdkPayload: ClassroomJoinTicket["sdk"] = null;
     if (approvedForExternalSdk) {
-      const sdkKey = process.env.ZOOM_SDK_KEY!;
-      const sdkSecret = process.env.ZOOM_SDK_SECRET!;
+      const runtimeSettings = getRuntimeSettings();
+      const sdkKey =
+        process.env.ZOOM_SDK_KEY || runtimeSettings.zoomSdkKey || "eduon-sdk-key";
+      const sdkSecret =
+        process.env.ZOOM_SDK_SECRET ||
+        runtimeSettings.zoomSdkSecret ||
+        "eduon-dev-sdk-secret-32bytes-minimum";
       const signature = createZoomSdkSignature({
         sdkKey,
         sdkSecret,

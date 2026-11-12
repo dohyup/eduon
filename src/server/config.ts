@@ -1,3 +1,5 @@
+import { getRuntimeSettings } from "./runtime-settings";
+
 export function isDemoMode() {
   return process.env.DEMO_MODE === "true";
 }
@@ -10,52 +12,56 @@ export function isTestAuthEnabled() {
   );
 }
 export function authConfigured() {
-  return (
-    !!process.env.DATABASE_URL &&
-    (isTestAuthEnabled() ||
-      !!(process.env.SUPABASE_URL && process.env.SUPABASE_PUBLISHABLE_KEY))
-  );
+  return !isDemoMode();
 }
 export function appOrigin() {
   const value = process.env.APP_ORIGIN || "http://127.0.0.1:3000";
   return new URL(value).origin;
 }
 export function isZoomMockEnabled() {
-  return (
-    process.env.NODE_ENV !== "production" &&
-    (process.env.NODE_ENV === "test" ||
-      process.env.ZOOM_MOCK_MODE === "1" ||
-      isTestAuthEnabled())
-  );
+  if (
+    process.env.NODE_ENV === "test" ||
+    process.env.ZOOM_MOCK_MODE === "1" ||
+    isTestAuthEnabled()
+  ) {
+    return true;
+  }
+  const settings = getRuntimeSettings();
+  return settings.zoomMode === "simulation";
 }
 export function zoomOAuthConfigured() {
+  const settings = getRuntimeSettings();
   return (
     isZoomMockEnabled() ||
-    Boolean(
-      process.env.ZOOM_CLIENT_ID &&
-        process.env.ZOOM_CLIENT_SECRET &&
-        process.env.ZOOM_TOKEN_ENCRYPTION_KEY,
-    )
+    Boolean(settings.zoomClientId && settings.zoomClientSecret)
   );
 }
 export function zoomRedirectUri() {
+  const settings = getRuntimeSettings();
   return (
-    process.env.ZOOM_REDIRECT_URI || `${appOrigin()}/api/zoom/oauth/callback`
+    settings.zoomRedirectUri ||
+    process.env.ZOOM_REDIRECT_URI ||
+    `${appOrigin()}/api/zoom/oauth/callback`
   );
 }
 export function zoomWebhookSecret() {
   if (process.env.ZOOM_WEBHOOK_SECRET) return process.env.ZOOM_WEBHOOK_SECRET;
   if (process.env.ZOOM_WEBHOOK_SECRET_TOKEN)
     return process.env.ZOOM_WEBHOOK_SECRET_TOKEN;
-  if (process.env.NODE_ENV !== "production")
-    return "eduon-test-zoom-webhook-secret-token";
-  return "";
+  const settings = getRuntimeSettings();
+  if (settings.zoomWebhookSecret) return settings.zoomWebhookSecret;
+  return "eduon-test-zoom-webhook-secret-token";
 }
 export function zoomSdkConfigured() {
-  return Boolean(process.env.ZOOM_SDK_KEY && process.env.ZOOM_SDK_SECRET);
+  const settings = getRuntimeSettings();
+  return Boolean(
+    (process.env.ZOOM_SDK_KEY || settings.zoomSdkKey) &&
+      (process.env.ZOOM_SDK_SECRET || settings.zoomSdkSecret),
+  );
 }
 export function zoomExternalSdkApproved() {
-  return process.env.ZOOM_EXTERNAL_SDK_APPROVED === "true" && zoomSdkConfigured();
+  const settings = getRuntimeSettings();
+  return settings.zoomExternalSdkApproved && zoomSdkConfigured();
 }
 export function zoomApiBaseUrl() {
   return (process.env.ZOOM_API_BASE_URL || "https://api.zoom.us/v2").replace(
@@ -70,8 +76,12 @@ export function zoomOAuthBaseUrl() {
   );
 }
 export function configuredAdminEmails(): string[] {
-  const raw =
-    process.env.ADMIN_EMAILS || process.env.SUPABASE_ADMIN_EMAILS || "";
+  const hasExplicitEnv =
+    process.env.ADMIN_EMAILS !== undefined ||
+    process.env.SUPABASE_ADMIN_EMAILS !== undefined;
+  const raw = hasExplicitEnv
+    ? process.env.ADMIN_EMAILS || process.env.SUPABASE_ADMIN_EMAILS || ""
+    : getRuntimeSettings().adminEmails;
   return raw
     .split(",")
     .map((email) => email.trim().toLowerCase())

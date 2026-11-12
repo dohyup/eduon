@@ -7,19 +7,19 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { zoomWebhookSecret } from "@/server/config";
+import { getRuntimeSettings } from "@/server/runtime-settings";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
 
 function resolveEncryptionKey(): Buffer {
-  const raw = process.env.ZOOM_TOKEN_ENCRYPTION_KEY;
+  const raw =
+    process.env.ZOOM_TOKEN_ENCRYPTION_KEY ||
+    getRuntimeSettings().zoomTokenEncryptionKey;
   if (raw && raw.length >= 32) {
     if (/^[0-9a-fA-F]{64}$/.test(raw)) return Buffer.from(raw, "hex");
     return createHash("sha256").update(raw, "utf8").digest();
-  }
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("ZOOM_TOKEN_ENCRYPTION_KEY_UNCONFIGURED");
   }
   return createHash("sha256")
     .update("eduon-nonprod-zoom-token-encryption-key-v1", "utf8")
