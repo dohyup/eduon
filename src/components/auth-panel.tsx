@@ -29,7 +29,7 @@ export function AuthPanel({
 
   async function submitPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || !configured) return;
+    if (busy) return;
     setBusy(true);
     setMessage("");
     setFailed(false);
@@ -51,10 +51,10 @@ export function AuthPanel({
             ? "아이디(또는 이메일)나 비밀번호가 일치하지 않습니다."
             : result.code === "RATE_LIMITED"
               ? "로그인 시도가 많습니다. 잠시 후 다시 시도해 주세요."
-              : "로그인 처리를 완료하지 못했습니다. 설정 상태를 확인해 주세요.",
+              : "로그인 처리를 완료하지 못했습니다. 입력 정보를 다시 확인해 주세요.",
         );
       } else {
-        setMessage("로그인되었습니다. 이동 중…");
+        setMessage("로그인되었습니다. 관리자 페이지로 이동합니다…");
         router.push(result.value?.redirectPath || "/admin");
         router.refresh();
       }
@@ -120,7 +120,7 @@ export function AuthPanel({
             : "이메일로 받은 보안 링크를 통해 로그인합니다."}
         </p>
 
-        {configured && mode === "login" && (
+        {mode === "login" && (
           <div className={styles.actions}>
             <button
               type="button"
@@ -151,7 +151,7 @@ export function AuthPanel({
           </div>
         )}
 
-        {configured && mode === "login" && loginMethod === "password" ? (
+        {mode === "login" && loginMethod === "password" ? (
           <form onSubmit={submitPassword} className={styles.form}>
             <label htmlFor="auth-identifier">
               아이디 또는 이메일
@@ -228,9 +228,9 @@ export function AuthPanel({
           <div className={styles.warning} role="status">
             <strong>인증 서비스 설정이 필요합니다</strong>
             <p>
-              Supabase 인증 연결이 아직 준비되지 않았습니다. 현재 실제
-              로그인·회원가입을 진행할 수 없습니다. 운영자가 인증 환경변수와
-              메일 발송 설정을 확인해야 합니다.
+              이메일 OTP 링크 발송을 사용하려면 Supabase 환경변수 설정이
+              필요합니다. 관리자는 상단의 「아이디·비밀번호 로그인」 탭을
+              이용해 주세요.
             </p>
           </div>
         )}

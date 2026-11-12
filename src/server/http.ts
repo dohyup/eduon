@@ -35,7 +35,45 @@ export function respond<T>(result: Outcome<T>) {
   });
 }
 export function verifyOrigin(request: Request) {
-  ensure(request.headers.get("origin") === appOrigin(), "FORBIDDEN");
+  const origin = request.headers.get("origin");
+  ensure(origin, "FORBIDDEN");
+  const expected = appOrigin();
+  if (origin === expected) return;
+  try {
+    const oUrl = new URL(origin);
+    const eUrl = new URL(expected);
+    const isLoopback = (h: string) => h === "127.0.0.1" || h === "localhost";
+    if (
+      oUrl.protocol === eUrl.protocol &&
+      oUrl.port === eUrl.port &&
+      isLoopback(oUrl.hostname) &&
+      isLoopback(eUrl.hostname)
+    ) {
+      return;
+    }
+    const stripWww = (h: string) => h.replace(/^www\./i, "").toLowerCase();
+    if (
+      oUrl.protocol === eUrl.protocol &&
+      oUrl.port === eUrl.port &&
+      stripWww(oUrl.hostname) === stripWww(eUrl.hostname)
+    ) {
+      return;
+    }
+    if (stripWww(oUrl.hostname) === "eduonlink.com") {
+      return;
+    }
+    const reqUrl = new URL(request.url);
+    if (origin === reqUrl.origin) return;
+    const fwdHost =
+      request.headers.get("x-forwarded-host") || request.headers.get("host");
+    const fwdProto =
+      request.headers.get("x-forwarded-proto") ||
+      reqUrl.protocol.replace(":", "");
+    if (fwdHost && origin === `${fwdProto}://${fwdHost}`) return;
+  } catch {
+    // fallthrough
+  }
+  throw new AppError("FORBIDDEN");
 }
 export async function readJson(request: Request) {
   ensure(

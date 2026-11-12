@@ -14,6 +14,20 @@ it("외부 Origin과 Origin 누락을 거부한다", () => {
   expect(() => verifyOrigin(new Request("http://127.0.0.1:3000"))).toThrow(
     "FORBIDDEN",
   );
+  expect(() =>
+    verifyOrigin(
+      new Request("https://www.eduonlink.com/api/auth/password", {
+        headers: { Origin: "https://www.eduonlink.com" },
+      }),
+    ),
+  ).not.toThrow();
+  expect(() =>
+    verifyOrigin(
+      new Request("https://eduonlink.com/api/auth/password", {
+        headers: { Origin: "https://www.eduonlink.com" },
+      }),
+    ),
+  ).not.toThrow();
 });
 it("길이 헤더를 속여도 스트리밍 본문 상한을 적용한다", async () => {
   const r = new Request("http://127.0.0.1", {

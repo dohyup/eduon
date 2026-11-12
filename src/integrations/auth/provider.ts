@@ -10,13 +10,18 @@ import {
   isTestAuthEnabled,
 } from "@/server/config";
 import { verifyTestSession } from "./test-session";
+const DEFAULT_SUPABASE_URL = "https://mljnplnoipkxtggnsqoj.supabase.co";
+const DEFAULT_SUPABASE_PUBLISHABLE_KEY =
+  "sb_publishable_LOMCnSMcMIRMFsOo8ke6Hw_j6V134Gl";
+
 export async function createAuthClient() {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_PUBLISHABLE_KEY)
-    throw new Error("AUTH_UNCONFIGURED");
+  const supabaseUrl = process.env.SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const supabaseKey =
+    process.env.SUPABASE_PUBLISHABLE_KEY || DEFAULT_SUPABASE_PUBLISHABLE_KEY;
   const jar = await cookies();
   return createServerClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_PUBLISHABLE_KEY,
+    supabaseUrl,
+    supabaseKey,
     {
       global: { fetch: authFetch },
       cookieOptions: {
