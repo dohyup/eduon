@@ -35,12 +35,43 @@ function settingsFilePath(): string {
   return path.join(os.tmpdir(), "eduon-runtime-settings.json");
 }
 
+const INVALID_TEST_CLIENT_IDS = new Set([
+  "live-client-id",
+  "test-zoom-client-id",
+]);
+const INVALID_TEST_CLIENT_SECRETS = new Set([
+  "live-client-secret-updated-value",
+  "test-zoom-client-secret",
+]);
+
+function sanitizePatch(
+  raw: Partial<RuntimePlatformSettings>,
+): Partial<RuntimePlatformSettings> {
+  const out = { ...raw };
+  if (
+    process.env.NODE_ENV !== "test" &&
+    out.zoomClientId &&
+    INVALID_TEST_CLIENT_IDS.has(out.zoomClientId)
+  ) {
+    out.zoomClientId = "";
+  }
+  if (
+    process.env.NODE_ENV !== "test" &&
+    out.zoomClientSecret &&
+    INVALID_TEST_CLIENT_SECRETS.has(out.zoomClientSecret)
+  ) {
+    out.zoomClientSecret = "";
+  }
+  return out;
+}
+
 function loadFromDisk(): Partial<RuntimePlatformSettings> {
+  if (process.env.NODE_ENV === "test") return {};
   try {
     const file = settingsFilePath();
     if (fs.existsSync(file)) {
       const raw = fs.readFileSync(file, "utf8");
-      return JSON.parse(raw) as Partial<RuntimePlatformSettings>;
+      return sanitizePatch(JSON.parse(raw) as Partial<RuntimePlatformSettings>);
     }
   } catch {
     // ignore read errors on serverless environments
@@ -49,6 +80,7 @@ function loadFromDisk(): Partial<RuntimePlatformSettings> {
 }
 
 function saveToDisk(settings: RuntimePlatformSettings): void {
+  if (process.env.NODE_ENV === "test") return;
   try {
     fs.writeFileSync(
       settingsFilePath(),
@@ -68,7 +100,7 @@ export function getRuntimeSettings(): RuntimePlatformSettings {
       ...disk,
     };
   }
-  const current = globalStore.__eduonRuntimeSettings;
+  const current = sanitizePatch(globalStore.__eduonRuntimeSettings);
   const accountId = current.zoomAccountId || process.env.ZOOM_ACCOUNT_ID || "";
   const clientId = current.zoomClientId || process.env.ZOOM_CLIENT_ID || "";
   const clientSecret =
@@ -96,7 +128,7 @@ export function getRuntimeSettings(): RuntimePlatformSettings {
       process.env.SUPABASE_ADMIN_EMAILS ||
       DEFAULT_SETTINGS.adminEmails,
     databaseUrl: current.databaseUrl || "",
-    updatedAt: current.updatedAt,
+    updatedAt: current.updatedAt || DEFAULT_SETTINGS.updatedAt,
     updatedByEmail: current.updatedByEmail,
   };
 }
@@ -106,10 +138,11 @@ export function updateRuntimeSettings(
   actorEmail?: string,
 ): RuntimePlatformSettings {
   const prev = getRuntimeSettings();
+  const cleanedPatch = sanitizePatch(patch);
   const next: RuntimePlatformSettings = {
     ...prev,
     ...Object.fromEntries(
-      Object.entries(patch).filter(([, v]) => v !== undefined),
+      Object.entries(cleanedPatch).filter(([, v]) => v !== undefined),
     ),
     updatedAt: new Date().toISOString(),
     ...(actorEmail ? { updatedByEmail: actorEmail } : {}),
@@ -123,10 +156,11 @@ export function hydrateRuntimeSettingsFromMetadata(
   meta: Record<string, unknown> | null | undefined,
 ): void {
   if (!meta || typeof meta !== "object") return;
-  const saved = meta.eduon_platform_settings as
+  const rawSaved = meta.eduon_platform_settings as
     | Partial<RuntimePlatformSettings>
     | undefined;
-  if (!saved || typeof saved !== "object") return;
+  if (!rawSaved || typeof rawSaved !== "object") return;
+  const saved = sanitizePatch(rawSaved);
   const current = globalStore.__eduonRuntimeSettings;
   if (
     !current ||

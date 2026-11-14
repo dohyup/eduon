@@ -1867,6 +1867,7 @@ export function LiveWorkspace({
                             </div>
                           )}
                           <form
+                            key={adminSettings?.updatedAt ?? "init"}
                             className={styles.form}
                             onSubmit={(event) => {
                               event.preventDefault();
@@ -1931,7 +1932,10 @@ export function LiveWorkspace({
                                 <input
                                   name="zoomClientId"
                                   defaultValue={
-                                    adminSettings?.zoomClientId ?? ""
+                                    adminSettings?.zoomClientId ===
+                                    "live-client-id"
+                                      ? ""
+                                      : (adminSettings?.zoomClientId ?? "")
                                   }
                                   placeholder="Zoom General App Client ID"
                                 />
@@ -1997,7 +2001,39 @@ export function LiveWorkspace({
                                 type="button"
                                 className={styles.primary}
                                 disabled={disabled}
-                                onClick={() => void connectZoomAccount()}
+                                onClick={async (event) => {
+                                  const form =
+                                    event.currentTarget.closest("form");
+                                  if (form) {
+                                    const data = new FormData(form);
+                                    const accId = String(
+                                      data.get("zoomAccountId") || "",
+                                    ).trim();
+                                    const cid = String(
+                                      data.get("zoomClientId") || "",
+                                    ).trim();
+                                    const csec = String(
+                                      data.get("zoomClientSecret") || "",
+                                    ).trim();
+                                    const ruri = String(
+                                      data.get("zoomRedirectUri") || "",
+                                    ).trim();
+                                    const wsec = String(
+                                      data.get("zoomWebhookSecret") || "",
+                                    ).trim();
+                                    if (cid || csec || accId || ruri || wsec) {
+                                      await api("/api/admin/settings", {
+                                        zoomMode: cid ? "live" : "simulation",
+                                        zoomAccountId: accId,
+                                        zoomClientId: cid,
+                                        zoomClientSecret: csec,
+                                        zoomRedirectUri: ruri,
+                                        zoomWebhookSecret: wsec,
+                                      });
+                                    }
+                                  }
+                                  await connectZoomAccount();
+                                }}
                               >
                                 {busy === "zoom-connect"
                                   ? "Zoom 인증 연결 중…"
