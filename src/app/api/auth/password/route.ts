@@ -9,7 +9,8 @@ import {
   isConfiguredAdminEmail,
   isDemoMode,
 } from "@/server/config";
-import { getDatabase } from "@/server/db";
+import { getDatabase, isUsingRuntimeDatabase } from "@/server/db";
+import { ensureRuntimeUserProvisioned } from "@/server/runtime-db";
 import { rateLimit } from "@/server/rate-limit";
 import { verifyOrigin, readJson, respond } from "@/server/http";
 import { AppError } from "@/server/errors";
@@ -123,36 +124,37 @@ export async function POST(r: Request) {
 
     let isPlatformAdmin = shouldGrantAdmin;
 
-    // 2. Sync user to PostgreSQL database if DATABASE_URL is configured
-    if (process.env.DATABASE_URL) {
-      try {
-        const db = getDatabase();
-        await rateLimit(
-          db,
-          "pwd:" + createHash("sha256").update(email).digest("hex"),
-          20,
-          new Date(),
-          900000,
-        );
-        const user = await db.user.upsert({
-          where: { id: identity.id },
-          create: {
-            id: identity.id,
-            email: normalizedEmail,
-            ...(shouldGrantAdmin ? { platformAdmin: true } : {}),
-          },
-          update: {
-            email: normalizedEmail,
-            ...(shouldGrantAdmin ? { platformAdmin: true } : {}),
-          },
-        });
-        if (user.disabledAt) {
-          return respond({ ok: false, code: "FORBIDDEN" });
-        }
-        isPlatformAdmin = user.platformAdmin;
-      } catch {
-        // Proceed with Supabase session even if local DATABASE_URL is not connected
+    // 2. Sync user to runtime or PostgreSQL database
+    try {
+      const db = getDatabase();
+      if (isUsingRuntimeDatabase()) {
+        ensureRuntimeUserProvisioned(identity.id, normalizedEmail);
       }
+      await rateLimit(
+        db,
+        "pwd:" + createHash("sha256").update(email).digest("hex"),
+        20,
+        new Date(),
+        900000,
+      );
+      const user = await db.user.upsert({
+        where: { id: identity.id },
+        create: {
+          id: identity.id,
+          email: normalizedEmail,
+          ...(shouldGrantAdmin ? { platformAdmin: true } : {}),
+        },
+        update: {
+          email: normalizedEmail,
+          ...(shouldGrantAdmin ? { platformAdmin: true } : {}),
+        },
+      });
+      if (user.disabledAt) {
+        return respond({ ok: false, code: "FORBIDDEN" });
+      }
+      isPlatformAdmin = user.platformAdmin;
+    } catch {
+      // Proceed with Supabase session even if DB sync encounters an error
     }
 
     if (isPlatformAdmin) {

@@ -109,7 +109,7 @@ export function getRuntimeSettings(): RuntimePlatformSettings {
       process.env.ADMIN_EMAILS ||
       process.env.SUPABASE_ADMIN_EMAILS ||
       DEFAULT_SETTINGS.adminEmails,
-    databaseUrl: current.databaseUrl || process.env.DATABASE_URL || "",
+    databaseUrl: current.databaseUrl || "",
     updatedAt: current.updatedAt,
     updatedByEmail: current.updatedByEmail,
   };

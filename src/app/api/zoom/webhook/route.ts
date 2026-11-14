@@ -4,7 +4,7 @@ import { noStore } from "@/server/http";
 import { processZoomWebhookRequest } from "@/modules/zoom/webhook";
 
 export async function POST(r: Request) {
-  if (isDemoMode() || !process.env.DATABASE_URL) {
+  if (isDemoMode()) {
     return Response.json(
       { ok: false, code: "UNAVAILABLE" },
       { status: 503, headers: noStore },

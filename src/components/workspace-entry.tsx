@@ -61,10 +61,16 @@ export async function WorkspaceEntry({
     redirect("/login");
   }
   if (role === "admin") {
-    const user = await getDatabase().user.findUnique({
-      where: { id: actor.userId },
-    });
-    if (!user?.platformAdmin && !verifiedAdminId)
+    let isPlatformAdmin = Boolean(verifiedAdminId);
+    try {
+      const user = await getDatabase().user.findUnique({
+        where: { id: actor.userId },
+      });
+      if (user?.platformAdmin) isPlatformAdmin = true;
+    } catch {
+      // allow verifiedAdminId fallback if DB query fails
+    }
+    if (!isPlatformAdmin)
       return (
         <main id="main-content" className="container page-content">
           <h1>운영 권한이 필요합니다</h1>

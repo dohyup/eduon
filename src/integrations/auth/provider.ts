@@ -2,17 +2,14 @@ import { authFetch } from "./fetch";
 import "server-only";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import { getDatabase } from "@/server/db";
+import { getDatabase, isUsingRuntimeDatabase } from "@/server/db";
 import {
   authConfigured,
   isConfiguredAdminEmail,
   isDemoMode,
   isTestAuthEnabled,
 } from "@/server/config";
-import {
-  getRuntimeSettings,
-  hydrateRuntimeSettingsFromMetadata,
-} from "@/server/runtime-settings";
+import { hydrateRuntimeSettingsFromMetadata } from "@/server/runtime-settings";
 import { ensureRuntimeUserProvisioned } from "@/server/runtime-db";
 import { verifyTestSession } from "./test-session";
 
@@ -87,7 +84,7 @@ export async function getActor() {
         normalizedEmail === "admin@eduon.kr";
       const shouldGrantAdmin =
         isConfiguredAdminEmail(normalizedEmail) || isSupabaseMetaAdmin;
-      if (!process.env.DATABASE_URL && !getRuntimeSettings().databaseUrl) {
+      if (isUsingRuntimeDatabase()) {
         ensureRuntimeUserProvisioned(identity.id, normalizedEmail);
       }
       const user = await db.user.upsert({
@@ -111,21 +108,25 @@ export async function getActor() {
   const adminCookie = jar.get("eduon-admin-session")?.value || "";
   const verifiedAdminId = verifyTestSession(adminCookie, ADMIN_FALLBACK_SECRET);
   if (verifiedAdminId) {
-    if (!process.env.DATABASE_URL && !getRuntimeSettings().databaseUrl) {
-      ensureRuntimeUserProvisioned(verifiedAdminId, "admin@eduon.kr");
+    try {
+      if (isUsingRuntimeDatabase()) {
+        ensureRuntimeUserProvisioned(verifiedAdminId, "admin@eduon.kr");
+      }
+      const user = await db.user.upsert({
+        where: { id: verifiedAdminId },
+        create: {
+          id: verifiedAdminId,
+          email: "admin@eduon.kr",
+          platformAdmin: true,
+        },
+        update: {
+          platformAdmin: true,
+        },
+      });
+      return !user.disabledAt ? { userId: user.id } : null;
+    } catch {
+      return { userId: verifiedAdminId };
     }
-    const user = await db.user.upsert({
-      where: { id: verifiedAdminId },
-      create: {
-        id: verifiedAdminId,
-        email: "admin@eduon.kr",
-        platformAdmin: true,
-      },
-      update: {
-        platformAdmin: true,
-      },
-    });
-    return !user.disabledAt ? { userId: user.id } : null;
   }
   return null;
 }
