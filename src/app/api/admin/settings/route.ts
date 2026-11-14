@@ -12,6 +12,7 @@ import { createAuthClient } from "@/integrations/auth/provider";
 const updateSchema = z
   .object({
     zoomMode: z.enum(["simulation", "live"]).optional(),
+    zoomAccountId: z.string().trim().max(200).optional(),
     zoomClientId: z.string().trim().max(200).optional(),
     zoomClientSecret: z.string().trim().max(256).optional(),
     zoomRedirectUri: z.string().trim().max(500).optional(),
@@ -23,6 +24,7 @@ function toPublicSettingsView() {
   const s = getRuntimeSettings();
   return {
     zoomMode: s.zoomMode,
+    zoomAccountId: s.zoomAccountId,
     zoomClientId: s.zoomClientId,
     hasClientSecret: Boolean(s.zoomClientSecret),
     maskedClientSecret: maskSecret(s.zoomClientSecret),
@@ -58,6 +60,10 @@ export function POST(request: Request) {
         const next = updateRuntimeSettings(
           {
             zoomMode: parsed.zoomMode ?? current.zoomMode,
+            zoomAccountId:
+              parsed.zoomAccountId !== undefined
+                ? parsed.zoomAccountId
+                : current.zoomAccountId,
             zoomClientId:
               parsed.zoomClientId !== undefined
                 ? parsed.zoomClientId

@@ -90,6 +90,14 @@ class HttpZoomProvider implements ZoomPort {
     const settings = getRuntimeSettings();
     const clientId = settings.zoomClientId || process.env.ZOOM_CLIENT_ID;
     if (!clientId) throw new ZoomApiError(503, "ZOOM_OAUTH_UNCONFIGURED");
+    const accountId =
+      settings.zoomAccountId || process.env.ZOOM_ACCOUNT_ID || "";
+    if (accountId) {
+      const localCb = new URL(zoomRedirectUri());
+      localCb.searchParams.set("code", `s2s-account:${accountId}`);
+      localCb.searchParams.set("state", state);
+      return localCb.toString();
+    }
     const url = new URL(`${zoomOAuthBaseUrl()}/authorize`);
     url.searchParams.set("response_type", "code");
     url.searchParams.set("client_id", clientId);
@@ -99,6 +107,38 @@ class HttpZoomProvider implements ZoomPort {
   }
 
   async exchangeCodeForTokens(code: string): Promise<ZoomOAuthTokenResponse> {
+    if (code.startsWith("s2s-account:")) {
+      const accountId = code.slice("s2s-account:".length).trim();
+      const body = new URLSearchParams({
+        grant_type: "account_credentials",
+        account_id: accountId,
+      });
+      const res = await fetchWithRetry(`${zoomOAuthBaseUrl()}/token`, {
+        method: "POST",
+        headers: {
+          Authorization: basicAuthHeader(),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: body.toString(),
+      });
+      if (!res.ok) {
+        throw new ZoomApiError(res.status, "ZOOM_OAUTH_TOKEN_EXCHANGE_FAILED");
+      }
+      const data = (await res.json()) as {
+        access_token?: string;
+        expires_in?: number;
+        scope?: string;
+      };
+      if (!data.access_token) {
+        throw new ZoomApiError(502, "ZOOM_OAUTH_INVALID_RESPONSE");
+      }
+      return {
+        accessToken: data.access_token,
+        refreshToken: `s2s-account:${accountId}`,
+        expiresInSeconds: Number(data.expires_in || 3600),
+        scope: String(data.scope || ZOOM_REQUIRED_SCOPES.join(" ")),
+      };
+    }
     const body = new URLSearchParams({
       grant_type: "authorization_code",
       code,
@@ -135,6 +175,9 @@ class HttpZoomProvider implements ZoomPort {
   async refreshTokens(refreshToken: string): Promise<ZoomOAuthTokenResponse> {
     if (refreshToken.startsWith("mock-")) {
       return mockProvider.refreshTokens(refreshToken);
+    }
+    if (refreshToken.startsWith("s2s-account:")) {
+      return this.exchangeCodeForTokens(refreshToken);
     }
     const body = new URLSearchParams({
       grant_type: "refresh_token",

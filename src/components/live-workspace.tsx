@@ -179,6 +179,7 @@ type AdminZoomDashboard = {
 };
 type AdminSettingsView = {
   zoomMode: "simulation" | "live";
+  zoomAccountId?: string;
   zoomClientId: string;
   hasClientSecret: boolean;
   maskedClientSecret: string;
@@ -1804,6 +1805,53 @@ export function LiveWorkspace({
                             별도 SDK 키 없이 강사가 본인의 개인 Zoom 계정을
                             연결하여 회의를 개설하고 수업에 입장할 수 있습니다.
                           </p>
+                          <div className={styles.warning}>
+                            <strong>
+                              Zoom OAuth 리디렉션 오류(4,700) 해결 안내 (중요)
+                            </strong>
+                            <p>
+                              Zoom 연결 시{" "}
+                              <code>
+                                잘못된 리디렉션:
+                                https://www.eduonlink.com/api/zoom/oauth/callback
+                                (4,700)
+                              </code>{" "}
+                              오류가 뜨는 경우,{" "}
+                              <a
+                                href="https://marketplace.zoom.us/user/build"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={styles.manualLink}
+                              >
+                                Zoom App Marketplace (Develop → Build App)
+                              </a>
+                              에서 생성하신 앱의{" "}
+                              <strong>OAuth Information</strong> 메뉴에 아래
+                              주소를 반드시 <strong>2곳 모두</strong> 등록하고
+                              Save 하셔야 합니다:
+                            </p>
+                            <p>
+                              1. <strong>OAuth Redirect URL</strong>:{" "}
+                              <code>
+                                {adminSettings?.zoomRedirectUri ||
+                                  "https://www.eduonlink.com/api/zoom/oauth/callback"}
+                              </code>
+                              <br />
+                              2. <strong>OAuth Allow Lists</strong>:{" "}
+                              <code>
+                                {adminSettings?.zoomRedirectUri ||
+                                  "https://www.eduonlink.com/api/zoom/oauth/callback"}
+                              </code>
+                            </p>
+                            <p className={styles.note}>
+                              ※ 만약 Zoom 앱이{" "}
+                              <strong>Server-to-Server OAuth</strong> 방식이라{" "}
+                              <strong>Account ID</strong>가 있다면, 아래{" "}
+                              <strong>Zoom Account ID (선택)</strong> 칸에
+                              Account ID를 입력하면 리디렉션 없이 즉시
+                              연결됩니다.
+                            </p>
+                          </div>
                           {adminSettings && (
                             <div className={styles.note}>
                               <strong>현재 적용 상태:</strong>{" "}
@@ -1814,10 +1862,8 @@ export function LiveWorkspace({
                               {adminSettings.hasClientSecret
                                 ? adminSettings.maskedClientSecret
                                 : "미입력"}{" "}
-                              · Webhook Secret:{" "}
-                              {adminSettings.hasWebhookSecret
-                                ? adminSettings.maskedWebhookSecret
-                                : "기본값 적용됨"}
+                              · Account ID:{" "}
+                              {adminSettings.zoomAccountId || "미사용(개인 OAuth)"}
                             </div>
                           )}
                           <form
@@ -1826,6 +1872,9 @@ export function LiveWorkspace({
                               event.preventDefault();
                               const form = event.currentTarget;
                               const data = new FormData(form);
+                              const accId = String(
+                                data.get("zoomAccountId") || "",
+                              ).trim();
                               const cid = String(
                                 data.get("zoomClientId") || "",
                               ).trim();
@@ -1844,6 +1893,7 @@ export function LiveWorkspace({
                                     (csec || adminSettings?.hasClientSecret)
                                       ? "live"
                                       : selectedMode,
+                                  zoomAccountId: accId,
                                   zoomClientId: cid,
                                   zoomClientSecret: csec,
                                   zoomRedirectUri: String(
@@ -1900,7 +1950,7 @@ export function LiveWorkspace({
                                 />
                               </label>
                               <label>
-                                Zoom OAuth Redirect URI
+                                Zoom OAuth Redirect URI (Zoom 앱 설정과 동일해야 함)
                                 <input
                                   name="zoomRedirectUri"
                                   defaultValue={
@@ -1908,6 +1958,16 @@ export function LiveWorkspace({
                                     "https://www.eduonlink.com/api/zoom/oauth/callback"
                                   }
                                   placeholder="https://www.eduonlink.com/api/zoom/oauth/callback"
+                                />
+                              </label>
+                              <label>
+                                Zoom Account ID (선택 · 입력 시 리디렉션 없이 즉시 연결)
+                                <input
+                                  name="zoomAccountId"
+                                  defaultValue={
+                                    adminSettings?.zoomAccountId ?? ""
+                                  }
+                                  placeholder="개인 OAuth 사용 시 비워두세요 (S2S 앱인 경우 입력)"
                                 />
                               </label>
                               <label>

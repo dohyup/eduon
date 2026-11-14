@@ -69,11 +69,26 @@ export async function GET(r: Request) {
 export function POST(r: Request) {
   return handle(
     r,
-    async (ctx) =>
-      completeZoomOAuthCallback(
+    async (ctx) => {
+      const result = await completeZoomOAuthCallback(
         ctx,
         (await readJson(r)) as { code: string; state: string },
-      ),
+      );
+      if (result.ok) {
+        try {
+          const liveOfferings = await ctx.db.offering.findMany({
+            where: { isZoomLive: true, status: { not: "cancelled" } },
+            select: { id: true },
+          });
+          for (const off of liveOfferings) {
+            await syncOfferingZoomMeetingsInternal(ctx, off.id);
+          }
+        } catch {
+          // ignore background sync error
+        }
+      }
+      return result;
+    },
     true,
   );
 }
