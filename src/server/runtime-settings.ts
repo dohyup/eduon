@@ -16,7 +16,7 @@ export interface RuntimePlatformSettings {
 }
 
 const DEFAULT_SETTINGS: RuntimePlatformSettings = {
-  zoomMode: "simulation",
+  zoomMode: "live",
   zoomAccountId: "",
   zoomClientId: "",
   zoomClientSecret: "",
@@ -107,9 +107,13 @@ export function getRuntimeSettings(): RuntimePlatformSettings {
     current.zoomClientSecret || process.env.ZOOM_CLIENT_SECRET || "";
   return {
     zoomMode:
-      clientId && clientSecret && process.env.ZOOM_MOCK_MODE !== "1"
-        ? "live"
-        : current.zoomMode || "simulation",
+      process.env.ZOOM_MOCK_MODE === "1"
+        ? "simulation"
+        : process.env.NODE_ENV !== "test"
+          ? "live"
+          : clientId && clientSecret
+            ? "live"
+            : current.zoomMode || "simulation",
     zoomAccountId: accountId,
     zoomClientId: clientId,
     zoomClientSecret: clientSecret,

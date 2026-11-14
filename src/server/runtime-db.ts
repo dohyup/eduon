@@ -1398,7 +1398,7 @@ export function ensureRuntimeUserProvisioned(userId: string, email: string): voi
     (z) =>
       z.status === "connected" &&
       typeof z.zoomUserId === "string" &&
-      z.zoomUserId !== "zoom-host-5f0d97dc79",
+      !z.zoomUserId.startsWith("zoom-host-"),
   );
   const existingZoom = store.zoomAccount.find((z) => z.userId === uid);
   if (!existingZoom) {
@@ -1434,7 +1434,8 @@ export function ensureRuntimeUserProvisioned(userId: string, email: string): voi
     );
   } else if (
     realConnectedZoom &&
-    existingZoom.zoomUserId === "zoom-host-5f0d97dc79"
+    typeof existingZoom.zoomUserId === "string" &&
+    existingZoom.zoomUserId.startsWith("zoom-host-")
   ) {
     existingZoom.zoomUserId = realConnectedZoom.zoomUserId;
     existingZoom.zoomEmail = realConnectedZoom.zoomEmail;
@@ -1515,7 +1516,12 @@ export function exportRuntimeSnapshot(): Record<string, unknown> {
   return {
     updatedAt: new Date().toISOString(),
     zoomAccounts: store.zoomAccount
-      .filter((z) => z.zoomUserId !== "zoom-host-5f0d97dc79")
+      .filter(
+        (z) =>
+          typeof z.zoomUserId === "string" &&
+          !z.zoomUserId.startsWith("zoom-host-") &&
+          !(typeof z.zoomEmail === "string" && z.zoomEmail.endsWith("@zoom.example.test")),
+      )
       .slice(-10),
     courses: store.course.slice(-20),
     offerings: store.offering.slice(-20),
@@ -1567,6 +1573,12 @@ export function hydrateRuntimeDbFromMetadata(
   if (Array.isArray(snap.zoomAccounts)) {
     for (const raw of snap.zoomAccounts) {
       if (!raw || typeof raw !== "object") continue;
+      if (
+        typeof raw.zoomUserId === "string" &&
+        raw.zoomUserId.startsWith("zoom-host-")
+      ) {
+        continue;
+      }
       const revived = reviveRow(raw);
       const idx = store.zoomAccount.findIndex(
         (z) => z.id === revived.id || z.userId === revived.userId,
@@ -1590,8 +1602,12 @@ export function hydrateRuntimeDbFromMetadata(
         store.zoomMeeting.push(revived);
       } else {
         const current = store.zoomMeeting[idx];
-        const currentIsDummy = current.zoomHostId === "zoom-host-5f0d97dc79";
-        const incomingIsReal = revived.zoomHostId !== "zoom-host-5f0d97dc79";
+        const currentIsDummy =
+          typeof current.zoomHostId === "string" &&
+          current.zoomHostId.startsWith("zoom-host-");
+        const incomingIsReal =
+          typeof revived.zoomHostId === "string" &&
+          !revived.zoomHostId.startsWith("zoom-host-");
         if (incomingIsReal || currentIsDummy) {
           store.zoomMeeting[idx] = { ...current, ...revived };
         }

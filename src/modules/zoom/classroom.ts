@@ -120,13 +120,13 @@ export function startZoomSessionByHost(
       !isTestMode &&
       (!zoomAccount ||
         zoomAccount.status !== "connected" ||
-        zoomAccount.zoomUserId === "zoom-host-5f0d97dc79")
+        zoomAccount.zoomUserId.startsWith("zoom-host-"))
     ) {
       const allConnected = await ctx.db.zoomAccount.findMany({
         where: { status: "connected" },
       });
       const realConnected = allConnected.find(
-        (acc) => acc.zoomUserId !== "zoom-host-5f0d97dc79",
+        (acc) => !acc.zoomUserId.startsWith("zoom-host-"),
       );
       const fallbackConnected = realConnected || allConnected[0];
       zoomAccount = await ctx.db.zoomAccount.upsert({
@@ -192,9 +192,9 @@ export function startZoomSessionByHost(
     let meeting = session.zoomMeeting;
     const isSeededDemoMeetingWithRealHost =
       !isTestMode &&
-      (meeting?.zoomHostId === "zoom-host-5f0d97dc79" ||
+      (meeting?.zoomHostId.startsWith("zoom-host-") ||
         meeting?.zoomMeetingId.startsWith("880")) &&
-      zoomAccount.zoomUserId !== "zoom-host-5f0d97dc79";
+      !zoomAccount.zoomUserId.startsWith("zoom-host-");
 
     if (
       !meeting ||
@@ -480,7 +480,7 @@ export function joinZoomSessionByStudent(
     const isDummyStudentMeeting =
       !isTestMode &&
       meeting &&
-      (meeting.zoomHostId === "zoom-host-5f0d97dc79" ||
+      (meeting.zoomHostId.startsWith("zoom-host-") ||
         meeting.zoomMeetingId.startsWith("880"));
     if (
       !isTestMode &&

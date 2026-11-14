@@ -139,17 +139,19 @@ export async function syncOfferingZoomMeetingsInternal(
   });
   if (
     process.env.NODE_ENV !== "test" &&
-    (!zoomAccount || zoomAccount.zoomUserId === "zoom-host-5f0d97dc79")
+    (!zoomAccount || zoomAccount.zoomUserId.startsWith("zoom-host-"))
   ) {
     const allAccounts = await ctx.db.zoomAccount.findMany({
       where: { status: "connected" },
     });
     const realAccount = allAccounts.find(
-      (acc) => acc.zoomUserId !== "zoom-host-5f0d97dc79",
+      (acc) => !acc.zoomUserId.startsWith("zoom-host-"),
     );
     if (realAccount) {
       zoomAccount = realAccount;
       primaryInstructorId = realAccount.userId;
+    } else if (zoomAccount?.zoomUserId.startsWith("zoom-host-")) {
+      zoomAccount = null;
     }
   }
 
@@ -255,7 +257,7 @@ export async function syncOfferingZoomMeetingsInternal(
       process.env.NODE_ENV !== "test" &&
       !accessToken.startsWith("mock-") &&
       existing &&
-      (existing.zoomHostId === "zoom-host-5f0d97dc79" ||
+      (existing.zoomHostId.startsWith("zoom-host-") ||
         existing.zoomMeetingId.startsWith("880"));
 
     if (

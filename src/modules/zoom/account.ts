@@ -91,7 +91,8 @@ export function formatSanitizedZoomAccount(
   if (
     process.env.NODE_ENV !== "test" &&
     !isZoomMockEnabled() &&
-    row.zoomUserId === "zoom-host-5f0d97dc79"
+    (row.zoomUserId.startsWith("zoom-host-") ||
+      row.zoomEmail?.endsWith("@zoom.example.test"))
   ) {
     return {
       connected: false,
@@ -343,7 +344,7 @@ export function completeZoomOAuthCallback(
       // Mark dummy seeded meetings so they re-sync to real Zoom meetings on the connected account
       if (
         process.env.NODE_ENV !== "test" &&
-        zoomProfile.id !== "zoom-host-5f0d97dc79"
+        !zoomProfile.id.startsWith("zoom-host-")
       ) {
         await tx.zoomMeeting.updateMany({
           where: { zoomHostId: "zoom-host-5f0d97dc79" },
