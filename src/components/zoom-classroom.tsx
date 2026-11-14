@@ -227,11 +227,20 @@ export function ZoomClassroom({
       );
       const json = (await res.json()) as Result<JoinTicket>;
       if (!res.ok || !json.ok) {
+        const errCode = !json.ok ? json.code : `HTTP_${res.status}`;
+        console.warn("[EDUON ZoomClassroom] Join ticket request failed:", {
+          sessionId: currentSession.id,
+          mode,
+          status: res.status,
+          code: errCode,
+        });
         setStatusError(true);
         setStatusMsg(
           !json.ok && json.code === "FORBIDDEN"
             ? "수업 입장 권한이 없거나 입장 가능 시간(시작 10분 전~종료 15분 후)이 아닙니다."
-            : "Zoom 회의 입장 정보를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+            : !json.ok && json.code === "EXPIRED"
+              ? "수강권 유효기간이 만료되었습니다."
+              : `Zoom 회의 입장 정보를 준비하지 못했습니다 (${errCode}). 잠시 후 다시 시도해 주세요.`,
         );
         return;
       }

@@ -5,12 +5,18 @@ import {
   createZoomSdkSignature,
   createZoomUrlValidationResponse,
   decryptZoomSecret,
+  decryptZoomSecretSafe,
   encryptZoomSecret,
   maskEmail,
   maskSensitivePayload,
   verifyRecordingStreamToken,
   verifyZoomWebhookSignature,
 } from "../../src/integrations/zoom/crypto";
+import { updateRuntimeSettings } from "../../src/server/runtime-settings";
+import {
+  createRuntimeDatabase,
+  ensureRuntimeUserProvisioned,
+} from "../../src/server/runtime-db";
 import {
   computeAttendanceStatusFromRate,
   mergeTimeIntervals,
@@ -147,6 +153,41 @@ describe("Zoom 암호화 및 보안 유틸리티", () => {
     expect(
       verifyRecordingStreamToken(token, new Date("2030-05-01T10:06:00Z")),
     ).toBeNull();
+  });
+
+  it("관리자 설정에서 zoomClientSecret 변경 후에도 기존 암호화된 토큰을 정상 복호화하고 사용자 프로비저닝을 보장한다", async () => {
+    const beforeSecret = encryptZoomSecret("seed-password-123456");
+    updateRuntimeSettings({
+      zoomClientId: "live-client-id",
+      zoomClientSecret: "live-client-secret-updated-value",
+    });
+    expect(decryptZoomSecret(beforeSecret)).toBe("seed-password-123456");
+    expect(decryptZoomSecretSafe("invalid-payload", "fallback-pw")).toBe(
+      "fallback-pw",
+    );
+
+    const dynamicSupabaseId = "a1b2c3d4-e5f6-4789-8012-3456789abcde";
+    ensureRuntimeUserProvisioned(dynamicSupabaseId, "admin@eduon.kr");
+    const db = createRuntimeDatabase() as {
+      zoomAccount: {
+        findUnique: (args: { where: { userId: string } }) => Promise<{
+          status: string;
+        } | null>;
+      };
+      studentProfile: {
+        findUnique: (args: { where: { accountUserId: string } }) => Promise<{
+          id: string;
+        } | null>;
+      };
+    };
+    const zoomAcc = await db.zoomAccount.findUnique({
+      where: { userId: dynamicSupabaseId },
+    });
+    const student = await db.studentProfile.findUnique({
+      where: { accountUserId: dynamicSupabaseId },
+    });
+    expect(zoomAcc?.status).toBe("connected");
+    expect(student?.id).toBeTruthy();
   });
 });
 

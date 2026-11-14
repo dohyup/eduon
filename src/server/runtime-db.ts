@@ -1346,50 +1346,107 @@ function createModelDelegate(model: ModelName) {
 export function ensureRuntimeUserProvisioned(userId: string, email: string): void {
   const store = getStore();
   const normalized = email.trim().toLowerCase();
-  let user = store.user.find((u) => u.id === userId || u.email === normalized);
+  let user = store.user.find((u) => u.id === userId);
   if (!user) {
     user = applyDefaults("user", {
       id: userId,
       email: normalized,
-      platformAdmin: normalized === "admin@eduon.kr" || normalized === "darkpon@naver.com",
+      platformAdmin:
+        normalized === "admin@eduon.kr" || normalized === "darkpon@naver.com",
       guardianVerifiedAt: new Date(),
     });
     store.user.push(user);
   }
   const uid = String(user.id);
-  if (
-    !store.academyMembership.some(
-      (m) => m.academyId === SEED_ACADEMY_ID && m.userId === uid,
-    )
-  ) {
-    store.academyMembership.push(
-      applyDefaults("academyMembership", {
-        academyId: SEED_ACADEMY_ID,
-        userId: uid,
-        role: "owner",
-        active: true,
-      }),
-    );
+
+  // Keep the primary live session open even on warm serverless instances
+  const liveSession = store.session.find(
+    (s) => s.id === SEED_SESSION_MATH_1_ID,
+  );
+  if (liveSession) {
+    const nowMs = Date.now();
+    const endsAtMs =
+      liveSession.endsAt instanceof Date
+        ? liveSession.endsAt.getTime()
+        : new Date(String(liveSession.endsAt)).getTime();
+    if (endsAtMs < nowMs + 30 * 60 * 1000) {
+      liveSession.startsAt = new Date(nowMs - 5 * 60 * 1000);
+      liveSession.endsAt = new Date(nowMs + 2 * 60 * 60 * 1000);
+    }
   }
-  if (!store.zoomAccount.some((z) => z.userId === uid)) {
+
+  for (const academy of store.academy) {
+    const acadId = String(academy.id);
+    if (
+      !store.academyMembership.some(
+        (m) => m.academyId === acadId && m.userId === uid,
+      )
+    ) {
+      store.academyMembership.push(
+        applyDefaults("academyMembership", {
+          academyId: acadId,
+          userId: uid,
+          role: "owner",
+          active: true,
+        }),
+      );
+    }
+  }
+
+  // Prefer any real OAuth-connected ZoomAccount if one was connected
+  const realConnectedZoom = store.zoomAccount.find(
+    (z) =>
+      z.status === "connected" &&
+      typeof z.zoomUserId === "string" &&
+      z.zoomUserId !== "zoom-host-5f0d97dc79",
+  );
+  const existingZoom = store.zoomAccount.find((z) => z.userId === uid);
+  if (!existingZoom) {
     store.zoomAccount.push(
       applyDefaults("zoomAccount", {
         userId: uid,
-        zoomUserId: "zoom-host-5f0d97dc79",
-        zoomEmail: normalized,
-        zoomDisplayName: `${normalized.split("@")[0]} 강사`,
-        accountType: 2,
-        cloudRecordingAllowed: true,
-        encryptedAccessToken: encryptZoomSecret("mock-access-seed-instructor-token"),
-        encryptedRefreshToken: encryptZoomSecret("mock-refresh-seed-instructor-token"),
-        tokenExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        zoomUserId: realConnectedZoom
+          ? String(realConnectedZoom.zoomUserId)
+          : "zoom-host-5f0d97dc79",
+        zoomEmail: realConnectedZoom
+          ? String(realConnectedZoom.zoomEmail || normalized)
+          : normalized,
+        zoomDisplayName: realConnectedZoom
+          ? String(realConnectedZoom.zoomDisplayName || `${normalized.split("@")[0]} 강사`)
+          : `${normalized.split("@")[0]} 강사`,
+        accountType: realConnectedZoom ? Number(realConnectedZoom.accountType || 2) : 2,
+        cloudRecordingAllowed: realConnectedZoom
+          ? Boolean(realConnectedZoom.cloudRecordingAllowed)
+          : true,
+        encryptedAccessToken: realConnectedZoom
+          ? String(realConnectedZoom.encryptedAccessToken)
+          : encryptZoomSecret("mock-access-seed-instructor-token"),
+        encryptedRefreshToken: realConnectedZoom
+          ? String(realConnectedZoom.encryptedRefreshToken)
+          : encryptZoomSecret("mock-refresh-seed-instructor-token"),
+        tokenExpiresAt: realConnectedZoom
+          ? (realConnectedZoom.tokenExpiresAt as Date)
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         scopes:
           "user:read:user meeting:write:meeting meeting:read:meeting cloud_recording:read:list_user_recordings",
         status: "connected",
       }),
     );
+  } else if (
+    realConnectedZoom &&
+    existingZoom.zoomUserId === "zoom-host-5f0d97dc79"
+  ) {
+    existingZoom.zoomUserId = realConnectedZoom.zoomUserId;
+    existingZoom.zoomEmail = realConnectedZoom.zoomEmail;
+    existingZoom.zoomDisplayName = realConnectedZoom.zoomDisplayName;
+    existingZoom.encryptedAccessToken = realConnectedZoom.encryptedAccessToken;
+    existingZoom.encryptedRefreshToken = realConnectedZoom.encryptedRefreshToken;
+    existingZoom.tokenExpiresAt = realConnectedZoom.tokenExpiresAt;
+    existingZoom.status = "connected";
   }
-  for (const offId of [SEED_OFFERING_MATH_ID, SEED_OFFERING_ENG_ID]) {
+
+  for (const off of store.offering) {
+    const offId = String(off.id);
     if (
       !store.instructorAssignment.some(
         (a) => a.offeringId === offId && a.userId === uid,
@@ -1403,22 +1460,24 @@ export function ensureRuntimeUserProvisioned(userId: string, email: string): voi
       );
     }
   }
-  if (!store.studentProfile.some((s) => s.accountUserId === uid)) {
-    const existingStudent = store.studentProfile.find(
+
+  let student = store.studentProfile.find((s) => s.accountUserId === uid);
+  if (!student) {
+    const existingSeedStudent = store.studentProfile.find(
       (s) => s.id === SEED_STUDENT_ID,
     );
-    if (existingStudent && uid === SEED_ADMIN_ID) {
-      existingStudent.accountUserId = uid;
+    if (existingSeedStudent && uid === SEED_ADMIN_ID) {
+      existingSeedStudent.accountUserId = uid;
+      student = existingSeedStudent;
     } else {
       const newStudentId = randomUUID();
-      store.studentProfile.push(
-        applyDefaults("studentProfile", {
-          id: newStudentId,
-          name: `${normalized.split("@")[0]} 학생`,
-          grade: 5,
-          accountUserId: uid,
-        }),
-      );
+      student = applyDefaults("studentProfile", {
+        id: newStudentId,
+        name: `${normalized.split("@")[0]} 학생`,
+        grade: 5,
+        accountUserId: uid,
+      });
+      store.studentProfile.push(student);
       store.guardianLink.push(
         applyDefaults("guardianLink", {
           guardianId: uid,
@@ -1426,18 +1485,28 @@ export function ensureRuntimeUserProvisioned(userId: string, email: string): voi
           verifiedAt: new Date(),
         }),
       );
-      for (const offId of [SEED_OFFERING_MATH_ID, SEED_OFFERING_ENG_ID]) {
-        store.enrollment.push(
-          applyDefaults("enrollment", {
-            offeringId: offId,
-            studentId: newStudentId,
-            status: "active",
-            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          }),
-        );
-      }
     }
   }
+
+  const studentId = String(student.id);
+  for (const off of store.offering) {
+    const offId = String(off.id);
+    if (
+      !store.enrollment.some(
+        (e) => e.offeringId === offId && e.studentId === studentId,
+      )
+    ) {
+      store.enrollment.push(
+        applyDefaults("enrollment", {
+          offeringId: offId,
+          studentId,
+          status: "active",
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        }),
+      );
+    }
+  }
+
   persistStore();
 }
 

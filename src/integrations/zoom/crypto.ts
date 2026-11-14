@@ -13,17 +13,40 @@ const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
 
-function resolveEncryptionKey(): Buffer {
-  const raw =
-    process.env.ZOOM_TOKEN_ENCRYPTION_KEY ||
-    getRuntimeSettings().zoomClientSecret ||
-    "eduon-zoom-oauth-token-encryption-key-2026-default";
+function deriveKeyFromRaw(raw: string): Buffer {
   if (raw && raw.length >= 32 && /^[0-9a-fA-F]{64}$/.test(raw)) {
     return Buffer.from(raw, "hex");
   }
   return createHash("sha256")
     .update(raw || "eduon-nonprod-zoom-token-encryption-key-v1", "utf8")
     .digest();
+}
+
+function resolveEncryptionKey(): Buffer {
+  const raw =
+    process.env.ZOOM_TOKEN_ENCRYPTION_KEY ||
+    "eduon-zoom-oauth-token-encryption-key-2026-default";
+  return deriveKeyFromRaw(raw);
+}
+
+function resolveCandidateDecryptionKeys(): Buffer[] {
+  const candidates = [
+    process.env.ZOOM_TOKEN_ENCRYPTION_KEY,
+    "eduon-zoom-oauth-token-encryption-key-2026-default",
+    getRuntimeSettings().zoomClientSecret,
+    "eduon-nonprod-zoom-token-encryption-key-v1",
+  ].filter((v): v is string => Boolean(v));
+  const seen = new Set<string>();
+  const keys: Buffer[] = [];
+  for (const raw of candidates) {
+    const key = deriveKeyFromRaw(raw);
+    const hex = key.toString("hex");
+    if (!seen.has(hex)) {
+      seen.add(hex);
+      keys.push(key);
+    }
+  }
+  return keys;
 }
 
 export function encryptZoomSecret(plaintext: string): string {
@@ -52,22 +75,43 @@ export function decryptZoomSecret(payload: string): string {
   if (parts.length !== 4 || parts[0] !== "v1") {
     throw new Error("INVALID_ENCRYPTED_ZOOM_SECRET");
   }
-  const key = resolveEncryptionKey();
   const iv = Buffer.from(parts[1], "base64url");
   const tag = Buffer.from(parts[2], "base64url");
   const ciphertext = Buffer.from(parts[3], "base64url");
   if (iv.length !== IV_LENGTH || tag.length !== TAG_LENGTH) {
     throw new Error("INVALID_ENCRYPTED_ZOOM_SECRET");
   }
-  const decipher = createDecipheriv(ALGORITHM, key, iv, {
-    authTagLength: TAG_LENGTH,
-  });
-  decipher.setAuthTag(tag);
-  const decrypted = Buffer.concat([
-    decipher.update(ciphertext),
-    decipher.final(),
-  ]);
-  return decrypted.toString("utf8");
+  let lastError: unknown;
+  for (const key of resolveCandidateDecryptionKeys()) {
+    try {
+      const decipher = createDecipheriv(ALGORITHM, key, iv, {
+        authTagLength: TAG_LENGTH,
+      });
+      decipher.setAuthTag(tag);
+      const decrypted = Buffer.concat([
+        decipher.update(ciphertext),
+        decipher.final(),
+      ]);
+      return decrypted.toString("utf8");
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("INVALID_ENCRYPTED_ZOOM_SECRET");
+}
+
+export function decryptZoomSecretSafe(
+  payload: string | null | undefined,
+  fallback = "",
+): string {
+  if (!payload) return fallback;
+  try {
+    return decryptZoomSecret(payload);
+  } catch {
+    return fallback;
+  }
 }
 
 export function hashOAuthState(state: string): string {
