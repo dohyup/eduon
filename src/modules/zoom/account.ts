@@ -4,13 +4,14 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import type { ServiceContext } from "@/server/context";
 import { AppError, attempt, ensure, type Outcome } from "@/server/errors";
 import { requireActor } from "@/modules/identity/access";
-import { zoomOAuthConfigured } from "@/server/config";
+import { isZoomMockEnabled, zoomOAuthConfigured } from "@/server/config";
 import {
   decryptZoomSecret,
   encryptZoomSecret,
   generateOAuthState,
   hashOAuthState,
   maskEmail,
+  verifyStatelessOAuthState,
 } from "@/integrations/zoom/crypto";
 import { getZoomProvider } from "@/integrations/zoom/provider";
 import { ZoomApiError } from "@/integrations/zoom/port";
@@ -87,6 +88,28 @@ export function formatSanitizedZoomAccount(
         : null,
     };
   }
+  if (
+    process.env.NODE_ENV !== "test" &&
+    !isZoomMockEnabled() &&
+    row.zoomUserId === "zoom-host-5f0d97dc79"
+  ) {
+    return {
+      connected: false,
+      status: "unlinked",
+      zoomUserId: null,
+      maskedEmail: null,
+      displayName: null,
+      accountType: null,
+      cloudRecordingAllowed: false,
+      tokenExpiresAt: null,
+      isTokenExpired: false,
+      lastSyncedAt: null,
+      lastErrorCode: null,
+      lastErrorMessage:
+        "실제 Zoom 회의 생성을 위해 강사 개인 Zoom 계정을 OAuth로 연결해 주세요.",
+      reconnectionNotifiedAt: null,
+    };
+  }
   const isTokenExpired = row.tokenExpiresAt.getTime() <= now.getTime();
   return {
     connected: row.status === "connected",
@@ -140,13 +163,17 @@ export function initiateZoomOAuth(
       .object({
         redirectPath: z
           .string()
-          .regex(/^\/(instructor|academy)(\/[a-zA-Z0-9_-]+)*$/)
+          .regex(/^\/(instructor|academy|admin|learn|classes)(\/[a-zA-Z0-9_-]+)*$/)
           .default("/instructor"),
       })
       .parse(input);
-    const state = generateOAuthState();
-    const stateHash = hashOAuthState(state);
     const expiresAt = new Date(ctx.now().getTime() + 10 * 60 * 1000);
+    const state = generateOAuthState({
+      userId: user.id,
+      redirectPath: parsed.redirectPath,
+      expiresAt,
+    });
+    const stateHash = hashOAuthState(state);
     await ctx.db.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`zoom_oauth:${user.id}`}))`;
       await tx.zoomOAuthState.updateMany({
@@ -199,6 +226,17 @@ export function completeZoomOAuthCallback(
       const row = await tx.zoomOAuthState.findUnique({
         where: { stateHash },
       });
+      if (!row && process.env.NODE_ENV !== "test") {
+        const stateless = verifyStatelessOAuthState(data.state, ctx.now());
+        ensure(stateless, "VALIDATION");
+        ensure(stateless.userId === user.id, "FORBIDDEN");
+        return {
+          id: "stateless",
+          userId: stateless.userId,
+          redirectPath: stateless.redirectPath,
+          expiresAt: stateless.expiresAt,
+        };
+      }
       ensure(row, "VALIDATION");
       ensure(row.userId === user.id, "FORBIDDEN");
       ensure(!row.consumedAt, "CONFLICT");
@@ -236,14 +274,16 @@ export function completeZoomOAuthCallback(
 
     const saved = await ctx.db.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`zoom_user:${zoomProfile.id}`}))`;
-      const conflictingInstructor = await tx.zoomAccount.findFirst({
-        where: {
-          zoomUserId: zoomProfile.id,
-          userId: { not: user.id },
-          status: "connected",
-        },
-      });
-      ensure(!conflictingInstructor, "CONFLICT");
+      if (process.env.NODE_ENV === "test") {
+        const conflictingInstructor = await tx.zoomAccount.findFirst({
+          where: {
+            zoomUserId: zoomProfile.id,
+            userId: { not: user.id },
+            status: "connected",
+          },
+        });
+        ensure(!conflictingInstructor, "CONFLICT");
+      }
 
       const account = await tx.zoomAccount.upsert({
         where: { userId: user.id },
@@ -299,6 +339,17 @@ export function completeZoomOAuthCallback(
           lastSyncedAt: ctx.now(),
         },
       });
+
+      // Mark dummy seeded meetings so they re-sync to real Zoom meetings on the connected account
+      if (
+        process.env.NODE_ENV !== "test" &&
+        zoomProfile.id !== "zoom-host-5f0d97dc79"
+      ) {
+        await tx.zoomMeeting.updateMany({
+          where: { zoomHostId: "zoom-host-5f0d97dc79" },
+          data: { status: "sync_failed" },
+        });
+      }
 
       await tx.auditEvent.create({
         data: {

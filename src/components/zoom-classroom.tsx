@@ -85,6 +85,7 @@ type JoinTicket = {
   role: "host" | "attendee";
   joinMode: "sdk_and_external" | "external_only";
   externalSdkApproved: boolean;
+  isSimulatedMeeting?: boolean;
   sdkNotice: string;
   sessionId: string;
   offeringId: string;
@@ -206,6 +207,54 @@ export function ZoomClassroom({
     data?.sessions.find((s) => s.id === selectedSessionId) ??
     data?.sessions[0] ??
     null;
+
+  async function handleConnectZoomOAuth() {
+    if (busy) return;
+    setBusy("zoom-oauth");
+    setStatusError(false);
+    setStatusMsg("");
+    try {
+      const redirectPath =
+        typeof window !== "undefined" ? window.location.pathname : "/instructor";
+      const res = await fetch("/api/zoom/account", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ redirectPath }),
+      });
+      const json = (await res.json()) as Result<{
+        authorizeUrl: string;
+        state: string;
+      }>;
+      if (!res.ok || !json.ok) {
+        setStatusError(true);
+        setStatusMsg(
+          "Zoom OAuth 연결을 시작하지 못했습니다. 관리자 설정에서 Zoom Client ID와 Client Secret을 확인해 주세요.",
+        );
+        return;
+      }
+      const targetUrl = new URL(json.value.authorizeUrl);
+      if (targetUrl.pathname === "/api/zoom/oauth/callback") {
+        const code = targetUrl.searchParams.get("code") || "";
+        const state = targetUrl.searchParams.get("state") || "";
+        await fetch("/api/zoom/oauth/callback", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, state }),
+        });
+        setStatusMsg("Zoom 계정이 연결되었습니다.");
+        await load();
+      } else {
+        window.location.assign(json.value.authorizeUrl);
+      }
+    } catch {
+      setStatusError(true);
+      setStatusMsg("Zoom OAuth 인증 페이지 이동 중 오류가 발생했습니다.");
+    } finally {
+      setBusy("");
+    }
+  }
 
   async function handleJoin(mode: "host" | "student") {
     if (!currentSession || busy) return;
@@ -725,16 +774,44 @@ export function ZoomClassroom({
                     </p>
                   </div>
                 )}
-                <div className={styles.actions}>
-                  <a
-                    href={ticket.externalJoinUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.secondary}
-                  >
-                    Zoom 앱 또는 브라우저로 외부 안전 입장 →
-                  </a>
-                </div>
+                {ticket.isSimulatedMeeting ? (
+                  <div className={styles.warning} style={{ marginTop: "12px" }}>
+                    <strong>
+                      실제 Zoom 앱/웹 회의를 열려면 강사 개인 Zoom 계정 OAuth 연결이
+                      필요합니다
+                    </strong>
+                    <p>
+                      현재 회의 번호(<code>{ticket.sdk?.meetingNumber}</code>)는
+                      OAuth 연결 전 생성된 내장 테스트 번호이므로 외부 Zoom 앱에서 열면{" "}
+                      <code>이 회의 링크가 잘못되었습니다 (3,001)</code> 안내가
+                      표시됩니다. 아래 버튼을 눌러 강사 개인 Zoom 계정을 연결하면 실제
+                      Zoom 회의가 즉시 생성됩니다.
+                    </p>
+                    <div className={styles.actions}>
+                      <button
+                        type="button"
+                        className={styles.primary}
+                        disabled={Boolean(busy)}
+                        onClick={() => void handleConnectZoomOAuth()}
+                      >
+                        {busy === "zoom-oauth"
+                          ? "Zoom 인증 연결 중…"
+                          : "강사 개인 Zoom 계정 OAuth 연결하고 실제 회의 생성하기 →"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.actions}>
+                    <a
+                      href={ticket.externalJoinUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.primary}
+                    >
+                      Zoom 앱 또는 브라우저로 실제 회의 입장 →
+                    </a>
+                  </div>
+                )}
               </div>
             )}
           </section>

@@ -1,7 +1,10 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { getActor } from "@/integrations/auth/provider";
+import {
+  getActor,
+  persistRuntimeStateToSupabase,
+} from "@/integrations/auth/provider";
 import { getDatabase } from "./db";
 import {
   AppError,
@@ -116,7 +119,11 @@ export async function handle(
     ensure(actor, "UNAUTHENTICATED");
     const db = getDatabase();
     if (mutate) await rateLimit(db, `mutate:${actor.userId}`, 60);
-    return respond(await fn({ actor, db, now: () => new Date() }));
+    const outcome = await fn({ actor, db, now: () => new Date() });
+    if (mutate && outcome.ok) {
+      await persistRuntimeStateToSupabase();
+    }
+    return respond(outcome);
   } catch (error) {
     if (error instanceof AppError)
       return respond({ ok: false, code: error.code });

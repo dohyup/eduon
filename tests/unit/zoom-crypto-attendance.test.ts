@@ -10,12 +10,15 @@ import {
   maskEmail,
   maskSensitivePayload,
   verifyRecordingStreamToken,
+  verifyStatelessOAuthState,
   verifyZoomWebhookSignature,
 } from "../../src/integrations/zoom/crypto";
 import { updateRuntimeSettings } from "../../src/server/runtime-settings";
 import {
   createRuntimeDatabase,
   ensureRuntimeUserProvisioned,
+  exportRuntimeSnapshot,
+  hydrateRuntimeDbFromMetadata,
 } from "../../src/server/runtime-db";
 import {
   computeAttendanceStatusFromRate,
@@ -188,6 +191,14 @@ describe("Zoom 암호화 및 보안 유틸리티", () => {
     });
     expect(zoomAcc?.status).toBe("connected");
     expect(student?.id).toBeTruthy();
+
+    // 스냅샷 직렬화 및 서버리스 인스턴스 간 메타데이터 복원 검증
+    const snapshot = exportRuntimeSnapshot();
+    expect(snapshot).toHaveProperty("offerings");
+    hydrateRuntimeDbFromMetadata({ eduon_runtime_snapshot: snapshot });
+    expect(
+      verifyStatelessOAuthState("invalid.state", new Date()),
+    ).toBeNull();
   });
 });
 

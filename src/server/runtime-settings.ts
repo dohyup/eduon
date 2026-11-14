@@ -67,17 +67,16 @@ export function getRuntimeSettings(): RuntimePlatformSettings {
     };
   }
   const current = globalStore.__eduonRuntimeSettings;
+  const clientId = current.zoomClientId || process.env.ZOOM_CLIENT_ID || "";
+  const clientSecret =
+    current.zoomClientSecret || process.env.ZOOM_CLIENT_SECRET || "";
   return {
     zoomMode:
-      current.zoomMode ||
-      (process.env.ZOOM_CLIENT_ID &&
-      process.env.ZOOM_CLIENT_SECRET &&
-      process.env.ZOOM_MOCK_MODE !== "1"
+      clientId && clientSecret && process.env.ZOOM_MOCK_MODE !== "1"
         ? "live"
-        : "simulation"),
-    zoomClientId: current.zoomClientId || process.env.ZOOM_CLIENT_ID || "",
-    zoomClientSecret:
-      current.zoomClientSecret || process.env.ZOOM_CLIENT_SECRET || "",
+        : current.zoomMode || "simulation",
+    zoomClientId: clientId,
+    zoomClientSecret: clientSecret,
     zoomRedirectUri:
       current.zoomRedirectUri ||
       process.env.ZOOM_REDIRECT_URI ||

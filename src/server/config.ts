@@ -27,6 +27,13 @@ export function isZoomMockEnabled() {
     return true;
   }
   const settings = getRuntimeSettings();
+  const hasRealCreds = Boolean(
+    (settings.zoomClientId || process.env.ZOOM_CLIENT_ID) &&
+      (settings.zoomClientSecret || process.env.ZOOM_CLIENT_SECRET),
+  );
+  if (hasRealCreds) {
+    return false;
+  }
   return settings.zoomMode === "simulation";
 }
 export function zoomOAuthConfigured() {

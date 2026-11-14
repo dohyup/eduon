@@ -29,6 +29,7 @@ export type ClassroomJoinTicket = {
   role: "host" | "attendee";
   joinMode: "sdk_and_external" | "external_only";
   externalSdkApproved: boolean;
+  isSimulatedMeeting?: boolean;
   sdkNotice: string;
   sessionId: string;
   offeringId: string;
@@ -115,10 +116,19 @@ export function startZoomSessionByHost(
     let zoomAccount = await ctx.db.zoomAccount.findUnique({
       where: { userId: actor.id },
     });
-    if ((!zoomAccount || zoomAccount.status !== "connected") && !isTestMode) {
-      const fallbackConnected = await ctx.db.zoomAccount.findFirst({
+    if (
+      !isTestMode &&
+      (!zoomAccount ||
+        zoomAccount.status !== "connected" ||
+        zoomAccount.zoomUserId === "zoom-host-5f0d97dc79")
+    ) {
+      const allConnected = await ctx.db.zoomAccount.findMany({
         where: { status: "connected" },
       });
+      const realConnected = allConnected.find(
+        (acc) => acc.zoomUserId !== "zoom-host-5f0d97dc79",
+      );
+      const fallbackConnected = realConnected || allConnected[0];
       zoomAccount = await ctx.db.zoomAccount.upsert({
         where: { userId: actor.id },
         create: {
@@ -149,11 +159,24 @@ export function startZoomSessionByHost(
         },
         update: {
           status: "connected",
+          zoomUserId:
+            realConnected?.zoomUserId ||
+            zoomAccount?.zoomUserId ||
+            "zoom-host-5f0d97dc79",
+          zoomEmail:
+            realConnected?.zoomEmail || zoomAccount?.zoomEmail || actor.email,
+          zoomDisplayName:
+            realConnected?.zoomDisplayName ||
+            zoomAccount?.zoomDisplayName ||
+            actor.email.split("@")[0] ||
+            "담당 강사",
           encryptedAccessToken:
+            realConnected?.encryptedAccessToken ||
             zoomAccount?.encryptedAccessToken ||
             fallbackConnected?.encryptedAccessToken ||
             encryptZoomSecret("mock-access-seed-instructor-token"),
           encryptedRefreshToken:
+            realConnected?.encryptedRefreshToken ||
             zoomAccount?.encryptedRefreshToken ||
             fallbackConnected?.encryptedRefreshToken ||
             encryptZoomSecret("mock-refresh-seed-instructor-token"),
@@ -169,7 +192,8 @@ export function startZoomSessionByHost(
     let meeting = session.zoomMeeting;
     const isSeededDemoMeetingWithRealHost =
       !isTestMode &&
-      meeting?.zoomHostId === "zoom-host-5f0d97dc79" &&
+      (meeting?.zoomHostId === "zoom-host-5f0d97dc79" ||
+        meeting?.zoomMeetingId.startsWith("880")) &&
       zoomAccount.zoomUserId !== "zoom-host-5f0d97dc79";
 
     if (
@@ -330,13 +354,21 @@ export function startZoomSessionByHost(
       now: ctx.now(),
     });
 
+    const isSimulatedMeeting =
+      !isTestMode &&
+      (updatedMeeting.zoomHostId.startsWith("zoom-host-") ||
+        updatedMeeting.zoomMeetingId.startsWith("880"));
+
     return {
       role: "host",
       joinMode: sdkReady ? "sdk_and_external" : "external_only",
       externalSdkApproved: zoomExternalSdkApproved(),
-      sdkNotice: sdkReady
-        ? "호스트(강사) ZAK 및 Meeting SDK 서명이 발급되었습니다."
-        : "Zoom Meeting SDK 키가 설정되지 않아 Zoom 앱/브라우저 호스트 시작 경로로 연결합니다.",
+      isSimulatedMeeting,
+      sdkNotice: isSimulatedMeeting
+        ? "현재 내장 시뮬레이션 강의실 모드입니다. 실제 Zoom 앱/브라우저 회의를 생성하려면 강사 개인 Zoom 계정을 OAuth로 연결해 주세요."
+        : sdkReady
+          ? "호스트(강사) ZAK 및 Meeting SDK 서명이 발급되었습니다."
+          : "Zoom Meeting SDK 키가 설정되지 않아 Zoom 앱/브라우저 호스트 시작 경로로 연결합니다.",
       sessionId: session.id,
       offeringId: session.offeringId,
       courseTitle: session.offering.course.title,
@@ -445,12 +477,18 @@ export function joinZoomSessionByStudent(
     }
 
     let meeting = session.zoomMeeting;
+    const isDummyStudentMeeting =
+      !isTestMode &&
+      meeting &&
+      (meeting.zoomHostId === "zoom-host-5f0d97dc79" ||
+        meeting.zoomMeetingId.startsWith("880"));
     if (
       !isTestMode &&
       (!meeting ||
         !meeting.zoomMeetingId ||
         !meeting.joinUrl ||
-        meeting.status === "sync_failed")
+        meeting.status === "sync_failed" ||
+        isDummyStudentMeeting)
     ) {
       await syncOfferingZoomMeetingsInternal(ctx, session.offeringId);
       meeting = await ctx.db.zoomMeeting.findUnique({
@@ -560,13 +598,21 @@ export function joinZoomSessionByStudent(
       },
     });
 
+    const isSimulatedMeeting =
+      !isTestMode &&
+      (meeting.zoomHostId.startsWith("zoom-host-") ||
+        meeting.zoomMeetingId.startsWith("880"));
+
     return {
       role: "attendee",
       joinMode: approvedForExternalSdk ? "sdk_and_external" : "external_only",
       externalSdkApproved: approvedForExternalSdk,
-      sdkNotice: approvedForExternalSdk
-        ? "Zoom Marketplace 외부 회의 SDK 승인이 확인되어 강의실 내장 화면(Component View) 및 외부 앱 입장을 모두 지원합니다."
-        : "2026년 Zoom 외부 호스트 회의 보안 정책에 따라 Zoom 앱 또는 공식 웹 브라우저로 안전하게 입장합니다.",
+      isSimulatedMeeting,
+      sdkNotice: isSimulatedMeeting
+        ? "현재 내장 시뮬레이션 강의실 모드입니다. 담당 강사가 개인 Zoom 계정을 OAuth로 연결하면 실제 Zoom 앱/웹 회의 링크가 활성화됩니다."
+        : approvedForExternalSdk
+          ? "Zoom Marketplace 외부 회의 SDK 승인이 확인되어 강의실 내장 화면(Component View) 및 외부 앱 입장을 모두 지원합니다."
+          : "2026년 Zoom 외부 호스트 회의 보안 정책에 따라 Zoom 앱 또는 공식 웹 브라우저로 안전하게 입장합니다.",
       sessionId: session.id,
       offeringId: session.offeringId,
       courseTitle: session.offering.course.title,

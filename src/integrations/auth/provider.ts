@@ -9,8 +9,15 @@ import {
   isDemoMode,
   isTestAuthEnabled,
 } from "@/server/config";
-import { hydrateRuntimeSettingsFromMetadata } from "@/server/runtime-settings";
-import { ensureRuntimeUserProvisioned } from "@/server/runtime-db";
+import {
+  getRuntimeSettings,
+  hydrateRuntimeSettingsFromMetadata,
+} from "@/server/runtime-settings";
+import {
+  ensureRuntimeUserProvisioned,
+  exportRuntimeSnapshot,
+  hydrateRuntimeDbFromMetadata,
+} from "@/server/runtime-db";
 import { verifyTestSession } from "./test-session";
 
 const DEFAULT_SUPABASE_URL = "https://mljnplnoipkxtggnsqoj.supabase.co";
@@ -71,9 +78,11 @@ export async function getActor() {
     const { data, error } = await supabase.auth.getUser();
     if (!error && data.user?.email && data.user.email_confirmed_at) {
       const identity = data.user;
-      hydrateRuntimeSettingsFromMetadata(
-        identity.user_metadata as Record<string, unknown> | undefined,
-      );
+      const userMeta = identity.user_metadata as
+        | Record<string, unknown>
+        | undefined;
+      hydrateRuntimeSettingsFromMetadata(userMeta);
+      hydrateRuntimeDbFromMetadata(userMeta);
       const normalizedEmail = identity.email!.toLowerCase();
       const appMeta = (identity.app_metadata ?? {}) as Record<string, unknown>;
       const isSupabaseMetaAdmin =
@@ -129,4 +138,25 @@ export async function getActor() {
     }
   }
   return null;
+}
+
+export async function persistRuntimeStateToSupabase(): Promise<void> {
+  if (
+    process.env.NODE_ENV === "test" ||
+    isTestAuthEnabled() ||
+    !isUsingRuntimeDatabase()
+  ) {
+    return;
+  }
+  try {
+    const supabase = await createAuthClient();
+    await supabase.auth.updateUser({
+      data: {
+        eduon_platform_settings: getRuntimeSettings(),
+        eduon_runtime_snapshot: exportRuntimeSnapshot(),
+      },
+    });
+  } catch {
+    // ignore if running offline or in read-only cookie context
+  }
 }

@@ -1826,19 +1826,26 @@ export function LiveWorkspace({
                               event.preventDefault();
                               const form = event.currentTarget;
                               const data = new FormData(form);
+                              const cid = String(
+                                data.get("zoomClientId") || "",
+                              ).trim();
+                              const csec = String(
+                                data.get("zoomClientSecret") || "",
+                              ).trim();
+                              const selectedMode = String(
+                                data.get("zoomMode") || "live",
+                              );
                               void mutate(
                                 "save-admin-settings",
                                 "/api/admin/settings",
                                 {
-                                  zoomMode: String(
-                                    data.get("zoomMode") || "simulation",
-                                  ),
-                                  zoomClientId: String(
-                                    data.get("zoomClientId") || "",
-                                  ).trim(),
-                                  zoomClientSecret: String(
-                                    data.get("zoomClientSecret") || "",
-                                  ).trim(),
+                                  zoomMode:
+                                    cid &&
+                                    (csec || adminSettings?.hasClientSecret)
+                                      ? "live"
+                                      : selectedMode,
+                                  zoomClientId: cid,
+                                  zoomClientSecret: csec,
                                   zoomRedirectUri: String(
                                     data.get("zoomRedirectUri") || "",
                                   ).trim(),
@@ -1856,14 +1863,16 @@ export function LiveWorkspace({
                                 <select
                                   name="zoomMode"
                                   defaultValue={
-                                    adminSettings?.zoomMode ?? "simulation"
+                                    adminSettings?.zoomClientId
+                                      ? "live"
+                                      : (adminSettings?.zoomMode ?? "live")
                                   }
                                 >
-                                  <option value="simulation">
-                                    즉시 수업·회의 생성 모드 (시뮬레이션/내장 연동)
-                                  </option>
                                   <option value="live">
                                     실제 Zoom Meeting SDK + OAuth 연동 모드 (강사 개인 계정)
+                                  </option>
+                                  <option value="simulation">
+                                    즉시 수업·회의 생성 모드 (시뮬레이션/내장 연동)
                                   </option>
                                 </select>
                               </label>
@@ -1922,7 +1931,17 @@ export function LiveWorkspace({
                               >
                                 {busy === "save-admin-settings"
                                   ? "설정 저장 중…"
-                                  : "설정 저장 (즉시 반영)"}
+                                  : "1단계: 설정 저장 (즉시 반영)"}
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.primary}
+                                disabled={disabled}
+                                onClick={() => void connectZoomAccount()}
+                              >
+                                {busy === "zoom-connect"
+                                  ? "Zoom 인증 연결 중…"
+                                  : "2단계: 강사 개인 Zoom 계정 OAuth 연결하기 →"}
                               </button>
                               <Link className={styles.secondary} href="/academy">
                                 수업 개설·관리(원장 공간)로 이동 →
@@ -1931,7 +1950,7 @@ export function LiveWorkspace({
                                 className={styles.secondary}
                                 href="/instructor"
                               >
-                                강사 Zoom 계정 연결·강의실로 이동 →
+                                강사 강의실로 이동 →
                               </Link>
                             </div>
                           </form>

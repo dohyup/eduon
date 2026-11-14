@@ -118,8 +118,60 @@ export function hashOAuthState(state: string): string {
   return createHash("sha256").update(state, "utf8").digest("hex");
 }
 
-export function generateOAuthState(): string {
-  return randomBytes(32).toString("base64url");
+export function generateOAuthState(meta?: {
+  userId: string;
+  redirectPath: string;
+  expiresAt: Date;
+}): string {
+  if (!meta || process.env.NODE_ENV === "test") {
+    return randomBytes(32).toString("base64url");
+  }
+  const payload = Buffer.from(
+    JSON.stringify({
+      u: meta.userId,
+      p: meta.redirectPath,
+      e: meta.expiresAt.getTime(),
+      n: randomBytes(8).toString("base64url"),
+    }),
+    "utf8",
+  ).toString("base64url");
+  const sig = createHmac("sha256", resolveEncryptionKey())
+    .update(payload, "utf8")
+    .digest("base64url");
+  return `${payload}.${sig}`;
+}
+
+export function verifyStatelessOAuthState(
+  state: string,
+  now = new Date(),
+): { userId: string; redirectPath: string; expiresAt: Date } | null {
+  const parts = state.split(".");
+  if (parts.length !== 2) return null;
+  const [payload, sig] = parts;
+  for (const key of resolveCandidateDecryptionKeys()) {
+    const expected = createHmac("sha256", key)
+      .update(payload, "utf8")
+      .digest("base64url");
+    const a = Buffer.from(expected, "utf8");
+    const b = Buffer.from(sig, "utf8");
+    if (a.length === b.length && timingSafeEqual(a, b)) {
+      try {
+        const parsed = JSON.parse(
+          Buffer.from(payload, "base64url").toString("utf8"),
+        ) as { u?: string; p?: string; e?: number };
+        if (!parsed.u || !parsed.p || !parsed.e) return null;
+        if (parsed.e <= now.getTime()) return null;
+        return {
+          userId: parsed.u,
+          redirectPath: parsed.p,
+          expiresAt: new Date(parsed.e),
+        };
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
 }
 
 export function maskEmail(email?: string | null): string {

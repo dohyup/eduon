@@ -1510,6 +1510,98 @@ export function ensureRuntimeUserProvisioned(userId: string, email: string): voi
   persistStore();
 }
 
+export function exportRuntimeSnapshot(): Record<string, unknown> {
+  const store = getStore();
+  return {
+    updatedAt: new Date().toISOString(),
+    zoomAccounts: store.zoomAccount
+      .filter((z) => z.zoomUserId !== "zoom-host-5f0d97dc79")
+      .slice(-10),
+    courses: store.course.slice(-20),
+    offerings: store.offering.slice(-20),
+    sessions: store.session.slice(-40),
+    instructorAssignments: store.instructorAssignment.slice(-40),
+    zoomMeetings: store.zoomMeeting.slice(-40),
+    enrollments: store.enrollment.slice(-40),
+  };
+}
+
+export function hydrateRuntimeDbFromMetadata(
+  meta: Record<string, unknown> | null | undefined,
+): void {
+  if (!meta || typeof meta !== "object") return;
+  const snap = meta.eduon_runtime_snapshot as
+    | {
+        zoomAccounts?: Row[];
+        courses?: Row[];
+        offerings?: Row[];
+        sessions?: Row[];
+        instructorAssignments?: Row[];
+        zoomMeetings?: Row[];
+        enrollments?: Row[];
+      }
+    | undefined;
+  if (!snap || typeof snap !== "object") return;
+
+  const store = getStore();
+  const upsertById = (table: Row[], incoming: Row[] | undefined) => {
+    if (!Array.isArray(incoming)) return;
+    for (const raw of incoming) {
+      if (!raw || typeof raw !== "object" || !raw.id) continue;
+      const revived = reviveRow(raw);
+      const idx = table.findIndex((r) => r.id === revived.id);
+      if (idx === -1) {
+        table.push(revived);
+      } else {
+        table[idx] = { ...table[idx], ...revived };
+      }
+    }
+  };
+
+  upsertById(store.course, snap.courses);
+  upsertById(store.offering, snap.offerings);
+  upsertById(store.session, snap.sessions);
+  upsertById(store.instructorAssignment, snap.instructorAssignments);
+  upsertById(store.enrollment, snap.enrollments);
+
+  if (Array.isArray(snap.zoomAccounts)) {
+    for (const raw of snap.zoomAccounts) {
+      if (!raw || typeof raw !== "object") continue;
+      const revived = reviveRow(raw);
+      const idx = store.zoomAccount.findIndex(
+        (z) => z.id === revived.id || z.userId === revived.userId,
+      );
+      if (idx === -1) {
+        store.zoomAccount.push(revived);
+      } else {
+        store.zoomAccount[idx] = { ...store.zoomAccount[idx], ...revived };
+      }
+    }
+  }
+
+  if (Array.isArray(snap.zoomMeetings)) {
+    for (const raw of snap.zoomMeetings) {
+      if (!raw || typeof raw !== "object") continue;
+      const revived = reviveRow(raw);
+      const idx = store.zoomMeeting.findIndex(
+        (m) => m.id === revived.id || m.sessionId === revived.sessionId,
+      );
+      if (idx === -1) {
+        store.zoomMeeting.push(revived);
+      } else {
+        const current = store.zoomMeeting[idx];
+        const currentIsDummy = current.zoomHostId === "zoom-host-5f0d97dc79";
+        const incomingIsReal = revived.zoomHostId !== "zoom-host-5f0d97dc79";
+        if (incomingIsReal || currentIsDummy) {
+          store.zoomMeeting[idx] = { ...current, ...revived };
+        }
+      }
+    }
+  }
+
+  persistStore();
+}
+
 export function createRuntimeDatabase() {
   if (!globalRuntimeDb.__eduonRuntimeClient) {
     const client: Record<string, unknown> = {
