@@ -185,13 +185,6 @@ type AdminSettingsView = {
   zoomRedirectUri: string;
   hasWebhookSecret: boolean;
   maskedWebhookSecret: string;
-  zoomSdkKey: string;
-  hasSdkSecret: boolean;
-  maskedSdkSecret: string;
-  zoomExternalSdkApproved: boolean;
-  adminEmails: string;
-  hasDatabaseUrl: boolean;
-  maskedDatabaseUrl: string;
   updatedAt: string;
   updatedByEmail: string | null;
 };
@@ -1803,18 +1796,20 @@ export function LiveWorkspace({
                       </Panel>
                     ) : (
                       <>
-                        <Panel title="Zoom 및 시스템 연동 설정 (DB·관리자 메뉴 설정)">
+                        <Panel title="Zoom Meeting SDK + OAuth 연동 설정 (강사 개인 계정 활용)">
                           <p>
-                            환경설정 파일(<code>.env</code>) 수정 없이 이 화면에서
-                            Zoom OAuth·Meeting SDK·Webhook·실행 모드 및 데이터베이스
-                            연결 정보를 설정하고 DB에 저장할 수 있습니다.
+                            Zoom General App(Meeting SDK + User-managed OAuth)의{" "}
+                            <strong>Client ID</strong>와{" "}
+                            <strong>Client Secret</strong>만 등록하면, 불필요한
+                            별도 SDK 키 없이 강사가 본인의 개인 Zoom 계정을
+                            연결하여 회의를 개설하고 수업에 입장할 수 있습니다.
                           </p>
                           {adminSettings && (
                             <div className={styles.note}>
                               <strong>현재 적용 상태:</strong>{" "}
                               {adminSettings.zoomMode === "simulation"
-                                ? "즉시 실행(시뮬레이션) 모드 — 별도 Zoom 키 입력 없이도 수업 개설·회의 자동생성·호스트/학생 입장·출석·녹화가 즉시 동작합니다."
-                                : "실제 Zoom OAuth/API 연동 모드"}{" "}
+                                ? "즉시 실행(시뮬레이션) 모드 — 키 입력 전에도 강사 Zoom 연결·회의 자동생성·호스트/학생 입장·출석·녹화가 즉시 동작합니다."
+                                : "실제 Zoom Meeting SDK + OAuth 연동 모드"}{" "}
                               · Client Secret:{" "}
                               {adminSettings.hasClientSecret
                                 ? adminSettings.maskedClientSecret
@@ -1822,11 +1817,7 @@ export function LiveWorkspace({
                               · Webhook Secret:{" "}
                               {adminSettings.hasWebhookSecret
                                 ? adminSettings.maskedWebhookSecret
-                                : "기본값 적용됨"}{" "}
-                              · SDK 승인:{" "}
-                              {adminSettings.zoomExternalSdkApproved
-                                ? "활성화"
-                                : "외부 안전입장 기본"}
+                                : "기본값 적용됨"}
                             </div>
                           )}
                           <form
@@ -1854,23 +1845,8 @@ export function LiveWorkspace({
                                   zoomWebhookSecret: String(
                                     data.get("zoomWebhookSecret") || "",
                                   ).trim(),
-                                  zoomSdkKey: String(
-                                    data.get("zoomSdkKey") || "",
-                                  ).trim(),
-                                  zoomSdkSecret: String(
-                                    data.get("zoomSdkSecret") || "",
-                                  ).trim(),
-                                  zoomExternalSdkApproved:
-                                    data.get("zoomExternalSdkApproved") ===
-                                    "true",
-                                  adminEmails: String(
-                                    data.get("adminEmails") || "",
-                                  ).trim(),
-                                  databaseUrl: String(
-                                    data.get("databaseUrl") || "",
-                                  ).trim(),
                                 },
-                                "Zoom 및 시스템 연동 설정을 DB에 저장하고 즉시 반영했습니다.",
+                                "Zoom Meeting SDK + OAuth 연동 설정을 저장하고 즉시 반영했습니다.",
                               );
                             }}
                           >
@@ -1887,40 +1863,22 @@ export function LiveWorkspace({
                                     즉시 수업·회의 생성 모드 (시뮬레이션/내장 연동)
                                   </option>
                                   <option value="live">
-                                    실제 Zoom Marketplace OAuth/API 연동 모드
+                                    실제 Zoom Meeting SDK + OAuth 연동 모드 (강사 개인 계정)
                                   </option>
                                 </select>
                               </label>
                               <label>
-                                외부 회의 Meeting SDK 승인 상태 (2026 정책)
-                                <select
-                                  name="zoomExternalSdkApproved"
-                                  defaultValue={
-                                    adminSettings?.zoomExternalSdkApproved
-                                      ? "true"
-                                      : "false"
-                                  }
-                                >
-                                  <option value="false">
-                                    외부 Zoom 앱/브라우저 안전 입장 기본
-                                  </option>
-                                  <option value="true">
-                                    승인 완료 (학생 내장 Component View + 외부 입장 모두 지원)
-                                  </option>
-                                </select>
-                              </label>
-                              <label>
-                                Zoom OAuth Client ID
+                                Zoom Client ID (OAuth &amp; Meeting SDK 통합)
                                 <input
                                   name="zoomClientId"
                                   defaultValue={
                                     adminSettings?.zoomClientId ?? ""
                                   }
-                                  placeholder="Zoom App Client ID (실연동 시 입력)"
+                                  placeholder="Zoom General App Client ID"
                                 />
                               </label>
                               <label>
-                                Zoom OAuth Client Secret
+                                Zoom Client Secret (OAuth &amp; Meeting SDK 통합)
                                 <input
                                   name="zoomClientSecret"
                                   type="password"
@@ -1928,7 +1886,7 @@ export function LiveWorkspace({
                                   placeholder={
                                     adminSettings?.hasClientSecret
                                       ? `저장됨 (${adminSettings.maskedClientSecret}) · 변경 시에만 입력`
-                                      : "Zoom App Client Secret"
+                                      : "Zoom General App Client Secret"
                                   }
                                 />
                               </label>
@@ -1937,13 +1895,14 @@ export function LiveWorkspace({
                                 <input
                                   name="zoomRedirectUri"
                                   defaultValue={
-                                    adminSettings?.zoomRedirectUri ?? ""
+                                    adminSettings?.zoomRedirectUri ||
+                                    "https://www.eduonlink.com/api/zoom/oauth/callback"
                                   }
                                   placeholder="https://www.eduonlink.com/api/zoom/oauth/callback"
                                 />
                               </label>
                               <label>
-                                Zoom Webhook Secret Token
+                                Zoom Webhook Secret Token (선택 · 출석/녹화 자동수신용)
                                 <input
                                   name="zoomWebhookSecret"
                                   type="password"
@@ -1955,50 +1914,6 @@ export function LiveWorkspace({
                                   }
                                 />
                               </label>
-                              <label>
-                                Zoom Meeting SDK Key
-                                <input
-                                  name="zoomSdkKey"
-                                  defaultValue={adminSettings?.zoomSdkKey ?? ""}
-                                  placeholder="Zoom Meeting SDK Key"
-                                />
-                              </label>
-                              <label>
-                                Zoom Meeting SDK Secret
-                                <input
-                                  name="zoomSdkSecret"
-                                  type="password"
-                                  autoComplete="off"
-                                  placeholder={
-                                    adminSettings?.hasSdkSecret
-                                      ? `저장됨 (${adminSettings.maskedSdkSecret}) · 변경 시에만 입력`
-                                      : "Zoom Meeting SDK Secret"
-                                  }
-                                />
-                              </label>
-                              <label>
-                                플랫폼 관리자 이메일 목록 (쉼표 구분)
-                                <input
-                                  name="adminEmails"
-                                  defaultValue={
-                                    adminSettings?.adminEmails ??
-                                    "admin@eduon.kr,darkpon@naver.com"
-                                  }
-                                />
-                              </label>
-                              <label>
-                                외부 PostgreSQL 연결 URL (선택 · 미입력 시 내장 런타임 DB 사용)
-                                <input
-                                  name="databaseUrl"
-                                  type="password"
-                                  autoComplete="off"
-                                  placeholder={
-                                    adminSettings?.hasDatabaseUrl
-                                      ? `저장됨 (${adminSettings.maskedDatabaseUrl})`
-                                      : "postgresql://... (미입력 시 내장 DB 자동 동작)"
-                                  }
-                                />
-                              </label>
                             </div>
                             <div className={styles.actions}>
                               <button
@@ -2007,7 +1922,7 @@ export function LiveWorkspace({
                               >
                                 {busy === "save-admin-settings"
                                   ? "설정 저장 중…"
-                                  : "설정 저장 (DB 즉시 반영)"}
+                                  : "설정 저장 (즉시 반영)"}
                               </button>
                               <Link className={styles.secondary} href="/academy">
                                 수업 개설·관리(원장 공간)로 이동 →
@@ -2016,7 +1931,7 @@ export function LiveWorkspace({
                                 className={styles.secondary}
                                 href="/instructor"
                               >
-                                강사 수업·강의실로 이동 →
+                                강사 Zoom 계정 연결·강의실로 이동 →
                               </Link>
                             </div>
                           </form>

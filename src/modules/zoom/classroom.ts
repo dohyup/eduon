@@ -173,11 +173,11 @@ export function startZoomSessionByHost(
     const runtimeSettings = getRuntimeSettings();
     const sdkKey =
       process.env.ZOOM_SDK_KEY ||
-      runtimeSettings.zoomSdkKey ||
+      runtimeSettings.zoomClientId ||
       "eduon-dev-sdk-key";
     const sdkSecret =
       process.env.ZOOM_SDK_SECRET ||
-      runtimeSettings.zoomSdkSecret ||
+      runtimeSettings.zoomClientSecret ||
       "eduon-dev-sdk-secret-32bytes-minimum";
 
     const signature = createZoomSdkSignature({
@@ -305,10 +305,12 @@ export function joinZoomSessionByStudent(
     if (approvedForExternalSdk) {
       const runtimeSettings = getRuntimeSettings();
       const sdkKey =
-        process.env.ZOOM_SDK_KEY || runtimeSettings.zoomSdkKey || "eduon-sdk-key";
+        process.env.ZOOM_SDK_KEY ||
+        runtimeSettings.zoomClientId ||
+        "eduon-sdk-key";
       const sdkSecret =
         process.env.ZOOM_SDK_SECRET ||
-        runtimeSettings.zoomSdkSecret ||
+        runtimeSettings.zoomClientSecret ||
         "eduon-dev-sdk-secret-32bytes-minimum";
       const signature = createZoomSdkSignature({
         sdkKey,

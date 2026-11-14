@@ -8,10 +8,6 @@ export interface RuntimePlatformSettings {
   zoomClientSecret: string;
   zoomRedirectUri: string;
   zoomWebhookSecret: string;
-  zoomTokenEncryptionKey: string;
-  zoomSdkKey: string;
-  zoomSdkSecret: string;
-  zoomExternalSdkApproved: boolean;
   adminEmails: string;
   databaseUrl: string;
   updatedAt: string;
@@ -22,13 +18,8 @@ const DEFAULT_SETTINGS: RuntimePlatformSettings = {
   zoomMode: "simulation",
   zoomClientId: "",
   zoomClientSecret: "",
-  zoomRedirectUri: "",
+  zoomRedirectUri: "https://www.eduonlink.com/api/zoom/oauth/callback",
   zoomWebhookSecret: "eduon-zoom-webhook-secret-token-2026",
-  zoomTokenEncryptionKey:
-    "eduon-production-zoom-token-encryption-key-2026-secure",
-  zoomSdkKey: "",
-  zoomSdkSecret: "",
-  zoomExternalSdkApproved: false,
   adminEmails: "admin@eduon.kr,darkpon@naver.com",
   databaseUrl: "",
   updatedAt: new Date(0).toISOString(),
@@ -88,22 +79,14 @@ export function getRuntimeSettings(): RuntimePlatformSettings {
     zoomClientSecret:
       current.zoomClientSecret || process.env.ZOOM_CLIENT_SECRET || "",
     zoomRedirectUri:
-      current.zoomRedirectUri || process.env.ZOOM_REDIRECT_URI || "",
+      current.zoomRedirectUri ||
+      process.env.ZOOM_REDIRECT_URI ||
+      DEFAULT_SETTINGS.zoomRedirectUri,
     zoomWebhookSecret:
       current.zoomWebhookSecret ||
       process.env.ZOOM_WEBHOOK_SECRET ||
       process.env.ZOOM_WEBHOOK_SECRET_TOKEN ||
       DEFAULT_SETTINGS.zoomWebhookSecret,
-    zoomTokenEncryptionKey:
-      current.zoomTokenEncryptionKey ||
-      process.env.ZOOM_TOKEN_ENCRYPTION_KEY ||
-      DEFAULT_SETTINGS.zoomTokenEncryptionKey,
-    zoomSdkKey: current.zoomSdkKey || process.env.ZOOM_SDK_KEY || "",
-    zoomSdkSecret: current.zoomSdkSecret || process.env.ZOOM_SDK_SECRET || "",
-    zoomExternalSdkApproved:
-      process.env.ZOOM_EXTERNAL_SDK_APPROVED !== undefined
-        ? process.env.ZOOM_EXTERNAL_SDK_APPROVED === "true"
-        : Boolean(current.zoomExternalSdkApproved),
     adminEmails:
       current.adminEmails ||
       process.env.ADMIN_EMAILS ||

@@ -22,12 +22,9 @@ console.log(
   `관리자 자동 지정 이메일(ADMIN_EMAILS): ${process.env.ADMIN_EMAILS || process.env.SUPABASE_ADMIN_EMAILS ? "설정됨" : "미설정"}`,
 );
 console.log(
-  `Zoom OAuth: ${process.env.ZOOM_CLIENT_ID && process.env.ZOOM_CLIENT_SECRET && process.env.ZOOM_TOKEN_ENCRYPTION_KEY ? "설정됨" : "미설정"}`,
+  `Zoom Meeting SDK + OAuth (Client ID/Secret): ${process.env.ZOOM_CLIENT_ID && process.env.ZOOM_CLIENT_SECRET ? "설정됨" : "관리자 메뉴(/admin) DB 설정 사용"}`,
 );
 console.log(
-  `Zoom Webhook: ${process.env.ZOOM_WEBHOOK_SECRET_TOKEN ? "설정됨" : "미설정"}`,
-);
-console.log(
-  `Zoom 외부 회의 SDK 심사 승인: ${process.env.ZOOM_EXTERNAL_SDK_APPROVED === "true" && process.env.ZOOM_SDK_KEY && process.env.ZOOM_SDK_SECRET ? "승인·활성화" : "외부 앱/브라우저 안전 입장 모드"}`,
+  `Zoom Webhook: ${process.env.ZOOM_WEBHOOK_SECRET_TOKEN ? "설정됨" : "관리자 메뉴(/admin) DB 설정 사용"}`,
 );
 if (required.some((key) => !process.env[key])) process.exitCode = 1;

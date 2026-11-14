@@ -16,13 +16,13 @@ const TAG_LENGTH = 16;
 function resolveEncryptionKey(): Buffer {
   const raw =
     process.env.ZOOM_TOKEN_ENCRYPTION_KEY ||
-    getRuntimeSettings().zoomTokenEncryptionKey;
-  if (raw && raw.length >= 32) {
-    if (/^[0-9a-fA-F]{64}$/.test(raw)) return Buffer.from(raw, "hex");
-    return createHash("sha256").update(raw, "utf8").digest();
+    getRuntimeSettings().zoomClientSecret ||
+    "eduon-zoom-oauth-token-encryption-key-2026-default";
+  if (raw && raw.length >= 32 && /^[0-9a-fA-F]{64}$/.test(raw)) {
+    return Buffer.from(raw, "hex");
   }
   return createHash("sha256")
-    .update("eduon-nonprod-zoom-token-encryption-key-v1", "utf8")
+    .update(raw || "eduon-nonprod-zoom-token-encryption-key-v1", "utf8")
     .digest();
 }
 

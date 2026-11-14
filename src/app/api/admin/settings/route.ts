@@ -16,12 +16,6 @@ const updateSchema = z
     zoomClientSecret: z.string().trim().max(256).optional(),
     zoomRedirectUri: z.string().trim().max(500).optional(),
     zoomWebhookSecret: z.string().trim().max(256).optional(),
-    zoomTokenEncryptionKey: z.string().trim().max(256).optional(),
-    zoomSdkKey: z.string().trim().max(200).optional(),
-    zoomSdkSecret: z.string().trim().max(256).optional(),
-    zoomExternalSdkApproved: z.boolean().optional(),
-    adminEmails: z.string().trim().max(1000).optional(),
-    databaseUrl: z.string().trim().max(1000).optional(),
   })
   .strict();
 
@@ -35,13 +29,6 @@ function toPublicSettingsView() {
     zoomRedirectUri: s.zoomRedirectUri,
     hasWebhookSecret: Boolean(s.zoomWebhookSecret),
     maskedWebhookSecret: maskSecret(s.zoomWebhookSecret),
-    zoomSdkKey: s.zoomSdkKey,
-    hasSdkSecret: Boolean(s.zoomSdkSecret),
-    maskedSdkSecret: maskSecret(s.zoomSdkSecret),
-    zoomExternalSdkApproved: s.zoomExternalSdkApproved,
-    adminEmails: s.adminEmails,
-    hasDatabaseUrl: Boolean(s.databaseUrl),
-    maskedDatabaseUrl: maskSecret(s.databaseUrl),
     updatedAt: s.updatedAt,
     updatedByEmail: s.updatedByEmail ?? null,
   };
@@ -87,29 +74,6 @@ export function POST(request: Request) {
               parsed.zoomWebhookSecret && parsed.zoomWebhookSecret.length > 0
                 ? parsed.zoomWebhookSecret
                 : current.zoomWebhookSecret,
-            zoomTokenEncryptionKey:
-              parsed.zoomTokenEncryptionKey &&
-              parsed.zoomTokenEncryptionKey.length >= 32
-                ? parsed.zoomTokenEncryptionKey
-                : current.zoomTokenEncryptionKey,
-            zoomSdkKey:
-              parsed.zoomSdkKey !== undefined
-                ? parsed.zoomSdkKey
-                : current.zoomSdkKey,
-            zoomSdkSecret:
-              parsed.zoomSdkSecret && parsed.zoomSdkSecret.length > 0
-                ? parsed.zoomSdkSecret
-                : current.zoomSdkSecret,
-            zoomExternalSdkApproved:
-              parsed.zoomExternalSdkApproved ?? current.zoomExternalSdkApproved,
-            adminEmails:
-              parsed.adminEmails !== undefined
-                ? parsed.adminEmails
-                : current.adminEmails,
-            databaseUrl:
-              parsed.databaseUrl !== undefined
-                ? parsed.databaseUrl
-                : current.databaseUrl,
           },
           actor.email,
         );
@@ -141,4 +105,3 @@ export function POST(request: Request) {
     true,
   );
 }
-

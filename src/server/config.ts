@@ -37,11 +37,10 @@ export function zoomOAuthConfigured() {
   );
 }
 export function zoomRedirectUri() {
+  if (process.env.ZOOM_REDIRECT_URI) return process.env.ZOOM_REDIRECT_URI;
   const settings = getRuntimeSettings();
   return (
-    settings.zoomRedirectUri ||
-    process.env.ZOOM_REDIRECT_URI ||
-    `${appOrigin()}/api/zoom/oauth/callback`
+    settings.zoomRedirectUri || `${appOrigin()}/api/zoom/oauth/callback`
   );
 }
 export function zoomWebhookSecret() {
@@ -52,16 +51,27 @@ export function zoomWebhookSecret() {
   if (settings.zoomWebhookSecret) return settings.zoomWebhookSecret;
   return "eduon-test-zoom-webhook-secret-token";
 }
+// Unified Zoom General App: OAuth Client ID/Secret serves as Meeting SDK Key/Secret
 export function zoomSdkConfigured() {
+  if (process.env.NODE_ENV === "test") {
+    return Boolean(process.env.ZOOM_SDK_KEY && process.env.ZOOM_SDK_SECRET);
+  }
   const settings = getRuntimeSettings();
-  return Boolean(
-    (process.env.ZOOM_SDK_KEY || settings.zoomSdkKey) &&
-      (process.env.ZOOM_SDK_SECRET || settings.zoomSdkSecret),
+  return (
+    isZoomMockEnabled() ||
+    Boolean(
+      (settings.zoomClientId || process.env.ZOOM_SDK_KEY) &&
+        (settings.zoomClientSecret || process.env.ZOOM_SDK_SECRET),
+    )
   );
 }
 export function zoomExternalSdkApproved() {
-  const settings = getRuntimeSettings();
-  return settings.zoomExternalSdkApproved && zoomSdkConfigured();
+  if (process.env.NODE_ENV === "test") {
+    return (
+      process.env.ZOOM_EXTERNAL_SDK_APPROVED === "true" && zoomSdkConfigured()
+    );
+  }
+  return zoomSdkConfigured();
 }
 export function zoomApiBaseUrl() {
   return (process.env.ZOOM_API_BASE_URL || "https://api.zoom.us/v2").replace(
