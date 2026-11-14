@@ -15,7 +15,6 @@ import {
 } from "@/server/runtime-settings";
 import {
   ensureRuntimeUserProvisioned,
-  exportRuntimeSnapshot,
   hydrateRuntimeDbFromMetadata,
 } from "@/server/runtime-db";
 import { verifyTestSession } from "./test-session";
@@ -27,6 +26,7 @@ const ADMIN_FALLBACK_SECRET =
   process.env.E2E_AUTH_SECRET ||
   process.env.ZOOM_TOKEN_ENCRYPTION_KEY ||
   "eduon-admin-fallback-session-secret-key-2026";
+const MAX_SUPABASE_COOKIE_BYTES = 3500;
 
 export async function createAuthClient() {
   const supabaseUrl = process.env.SUPABASE_URL || DEFAULT_SUPABASE_URL;
@@ -45,13 +45,36 @@ export async function createAuthClient() {
       getAll: () => jar.getAll(),
       setAll: (items) => {
         try {
-          for (const { name, value, options } of items)
+          const totalBytes = items.reduce(
+            (sum, item) => sum + item.name.length + item.value.length,
+            0,
+          );
+          const hasMultiChunks = items.some(
+            (item) => /\.\d+$/.test(item.name) && item.value.length > 0,
+          );
+          if (hasMultiChunks || totalBytes > MAX_SUPABASE_COOKIE_BYTES) {
+            for (const existing of jar.getAll()) {
+              if (existing.name.startsWith("sb-")) {
+                jar.set(existing.name, "", {
+                  httpOnly: true,
+                  sameSite: "lax",
+                  secure: process.env.NODE_ENV === "production",
+                  path: "/",
+                  maxAge: 0,
+                });
+              }
+            }
+            return;
+          }
+          for (const { name, value, options } of items) {
             jar.set(name, value, {
               ...options,
               httpOnly: true,
               sameSite: "lax",
               secure: process.env.NODE_ENV === "production",
+              path: "/",
             });
+          }
         } catch {
           /* Server Components cannot set cookies; proxy refreshes them. */
         }
@@ -149,11 +172,21 @@ export async function persistRuntimeStateToSupabase(): Promise<void> {
     return;
   }
   try {
+    const settings = getRuntimeSettings();
+    const compactSettings = {
+      zoomMode: settings.zoomMode,
+      zoomAccountId: settings.zoomAccountId,
+      zoomClientId: settings.zoomClientId,
+      zoomClientSecret: settings.zoomClientSecret,
+      zoomRedirectUri: settings.zoomRedirectUri,
+      zoomWebhookSecret: settings.zoomWebhookSecret,
+      updatedAt: settings.updatedAt,
+    };
     const supabase = await createAuthClient();
     await supabase.auth.updateUser({
       data: {
-        eduon_platform_settings: getRuntimeSettings(),
-        eduon_runtime_snapshot: exportRuntimeSnapshot(),
+        eduon_platform_settings: compactSettings,
+        eduon_runtime_snapshot: null,
       },
     });
   } catch {

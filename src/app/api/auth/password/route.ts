@@ -61,6 +61,31 @@ export async function POST(r: Request) {
         getAll: () => jar.getAll(),
         setAll: (items) => {
           try {
+            // Clear any legacy chunked sb-* cookies (.0, .1, ...) to prevent HTTP 431
+            for (const existing of jar.getAll()) {
+              if (
+                existing.name.startsWith("sb-") &&
+                /\.\d+$/.test(existing.name)
+              ) {
+                jar.set(existing.name, "", {
+                  httpOnly: true,
+                  sameSite: "lax",
+                  secure: process.env.NODE_ENV === "production",
+                  path: "/",
+                  maxAge: 0,
+                });
+              }
+            }
+            const totalBytes = items.reduce(
+              (sum, i) => sum + i.name.length + i.value.length,
+              0,
+            );
+            const isChunked = items.some(
+              (i) => /\.\d+$/.test(i.name) && i.value.length > 0,
+            );
+            if (isChunked || totalBytes > 3500) {
+              return;
+            }
             for (const { name, value, options } of items) {
               jar.set(name, value, {
                 ...options,

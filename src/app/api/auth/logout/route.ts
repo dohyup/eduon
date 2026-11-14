@@ -6,8 +6,21 @@ import { cookies } from "next/headers";
 export async function POST(r: Request) {
   try {
     verifyOrigin(r);
+    const jar = await cookies();
+    jar.delete("eduon-test-session");
+    jar.delete("eduon-admin-session");
+    for (const c of jar.getAll()) {
+      if (c.name.startsWith("sb-")) {
+        jar.set(c.name, "", {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          maxAge: 0,
+        });
+      }
+    }
     if (isTestAuthEnabled()) {
-      (await cookies()).delete("eduon-test-session");
       return respond({ ok: true, value: { signedOut: true } });
     }
     const auth = await createAuthClient();
