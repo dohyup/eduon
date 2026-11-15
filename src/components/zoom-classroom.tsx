@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import styles from "./live-workspace.module.css";
 
@@ -101,9 +101,102 @@ type JoinTicket = {
     meetingNumber: string;
     password: string;
     userName: string;
+    userEmail?: string;
+    zak?: string;
+    customerKey?: string;
     role: 0 | 1;
   } | null;
 };
+
+type ZoomEmbeddedClient = {
+  init: (options: Record<string, unknown>) => Promise<unknown>;
+  join: (options: Record<string, unknown>) => Promise<unknown>;
+  leaveMeeting?: () => Promise<unknown>;
+};
+
+type ZoomEmbeddedStatic = {
+  createClient: () => ZoomEmbeddedClient;
+  destroyClient?: () => void;
+};
+
+declare global {
+  interface Window {
+    __ZOOM_MEETINGSDK_UI_STATIC_BASE__?: string;
+    ZoomMtgEmbedded?: ZoomEmbeddedStatic;
+    "@zoom/meetingsdk"?: ZoomEmbeddedStatic;
+  }
+}
+
+const ZOOM_SDK_VERSION = "6.10.0";
+const ZOOM_CDN_BASE = `https://source.zoom.us/${ZOOM_SDK_VERSION}`;
+let zoomSdkLoadPromise: Promise<ZoomEmbeddedStatic> | null = null;
+
+function loadScriptOnce(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (typeof document === "undefined") {
+      reject(new Error("SSR_NOT_SUPPORTED"));
+      return;
+    }
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[data-zoom-sdk-src="${src}"]`,
+    );
+    if (existing) {
+      if (existing.dataset.loaded === "true") {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error(`SCRIPT_LOAD_FAILED:${src}`)),
+        { once: true },
+      );
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = false;
+    script.crossOrigin = "anonymous";
+    script.dataset.zoomSdkSrc = src;
+    script.onload = () => {
+      script.dataset.loaded = "true";
+      resolve();
+    };
+    script.onerror = () => reject(new Error(`SCRIPT_LOAD_FAILED:${src}`));
+    document.head.appendChild(script);
+  });
+}
+
+function loadZoomEmbeddedSdk(): Promise<ZoomEmbeddedStatic> {
+  if (typeof window !== "undefined") {
+    const ready = window.ZoomMtgEmbedded || window["@zoom/meetingsdk"];
+    if (ready) return Promise.resolve(ready);
+  }
+  if (zoomSdkLoadPromise) return zoomSdkLoadPromise;
+  zoomSdkLoadPromise = (async () => {
+    window.__ZOOM_MEETINGSDK_UI_STATIC_BASE__ = `${ZOOM_CDN_BASE}/ui/`;
+    const scripts = [
+      `${ZOOM_CDN_BASE}/lib/vendor/react.min.js`,
+      `${ZOOM_CDN_BASE}/lib/vendor/react-dom.min.js`,
+      `${ZOOM_CDN_BASE}/lib/vendor/redux.min.js`,
+      `${ZOOM_CDN_BASE}/lib/vendor/redux-thunk.min.js`,
+      `${ZOOM_CDN_BASE}/lib/vendor/lodash.min.js`,
+      `${ZOOM_CDN_BASE}/zoomus-websdk-embedded.umd.min.js`,
+    ];
+    for (const src of scripts) {
+      await loadScriptOnce(src);
+    }
+    const sdk = window.ZoomMtgEmbedded || window["@zoom/meetingsdk"];
+    if (!sdk) {
+      throw new Error("ZOOM_EMBEDDED_SDK_UNAVAILABLE");
+    }
+    return sdk;
+  })().catch((err) => {
+    zoomSdkLoadPromise = null;
+    throw err;
+  });
+  return zoomSdkLoadPromise;
+}
 
 type PlaybackInfo = {
   recordingId: string;
@@ -157,6 +250,138 @@ export function ZoomClassroom({
   const [ticket, setTicket] = useState<JoinTicket | null>(null);
   const [consentChecked, setConsentChecked] = useState(true);
   const [playback, setPlayback] = useState<PlaybackInfo | null>(null);
+  const [sdkMountState, setSdkMountState] = useState<
+    "idle" | "loading" | "initialized" | "joined" | "error"
+  >("idle");
+  const [sdkErrorMsg, setSdkErrorMsg] = useState("");
+  const [sdkExpanded, setSdkExpanded] = useState(false);
+  const zoomSdkRootRef = useRef<HTMLDivElement | null>(null);
+  const zoomClientRef = useRef<ZoomEmbeddedClient | null>(null);
+
+  const unmountZoomComponentView = useCallback(async () => {
+    try {
+      await zoomClientRef.current?.leaveMeeting?.();
+    } catch {
+      // ignore
+    }
+    try {
+      window.ZoomMtgEmbedded?.destroyClient?.();
+    } catch {
+      // ignore
+    }
+    zoomClientRef.current = null;
+    if (zoomSdkRootRef.current) {
+      zoomSdkRootRef.current.innerHTML = "";
+    }
+    setSdkMountState("idle");
+    setSdkErrorMsg("");
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      try {
+        void zoomClientRef.current?.leaveMeeting?.();
+        window.ZoomMtgEmbedded?.destroyClient?.();
+      } catch {
+        // ignore cleanup error
+      }
+    };
+  }, []);
+
+  const mountZoomComponentView = useCallback(
+    async (activeTicket: JoinTicket) => {
+      if (!activeTicket.sdk || !zoomSdkRootRef.current) return;
+      setSdkMountState("loading");
+      setSdkErrorMsg("");
+      try {
+        const ZoomMtgEmbedded = await loadZoomEmbeddedSdk();
+        try {
+          ZoomMtgEmbedded.destroyClient?.();
+        } catch {
+          // ignore
+        }
+        const rootEl = zoomSdkRootRef.current;
+        rootEl.innerHTML = "";
+        const rect = rootEl.getBoundingClientRect();
+        const viewWidth = Math.max(320, Math.floor(rect.width || 880) - 24);
+        const viewHeight = Math.max(380, sdkExpanded ? 620 : 460);
+
+        const client = ZoomMtgEmbedded.createClient();
+        zoomClientRef.current = client;
+
+        await client.init({
+          zoomAppRoot: rootEl,
+          language: "ko-KO",
+          patchJsMedia: true,
+          leaveOnPageUnload: true,
+          customize: {
+            video: {
+              isResizable: true,
+              viewSizes: {
+                default: {
+                  width: viewWidth,
+                  height: viewHeight,
+                },
+                ribbon: {
+                  width: 300,
+                  height: viewHeight,
+                },
+              },
+            },
+            meetingInfo: [
+              "topic",
+              "host",
+              "mn",
+              "pwd",
+              "participant",
+              "dc",
+              "enctype",
+            ],
+          },
+        });
+
+        if (activeTicket.isSimulatedMeeting) {
+          setSdkMountState("initialized");
+          return;
+        }
+
+        const joinParams: Record<string, unknown> = {
+          signature: activeTicket.sdk.signature,
+          meetingNumber: activeTicket.sdk.meetingNumber.replace(/\D/g, ""),
+          password: activeTicket.sdk.password || "",
+          userName: activeTicket.sdk.userName,
+        };
+        if (activeTicket.sdk.userEmail) {
+          joinParams.userEmail = activeTicket.sdk.userEmail;
+        }
+        if (
+          activeTicket.sdk.zak &&
+          !activeTicket.sdk.zak.startsWith("mock-")
+        ) {
+          joinParams.zak = activeTicket.sdk.zak;
+        }
+        if (activeTicket.sdk.customerKey) {
+          joinParams.customerKey = String(activeTicket.sdk.customerKey).slice(
+            0,
+            36,
+          );
+        }
+
+        await client.join(joinParams);
+        setSdkMountState("joined");
+      } catch (err) {
+        const reason =
+          err && typeof err === "object" && "reason" in err
+            ? String((err as { reason?: unknown }).reason)
+            : err instanceof Error
+              ? err.message
+              : "Zoom Meeting SDK 연결 중 오류가 발생했습니다.";
+        setSdkMountState("error");
+        setSdkErrorMsg(reason);
+      }
+    },
+    [sdkExpanded],
+  );
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -294,6 +519,7 @@ export function ZoomClassroom({
         return;
       }
       setTicket(json.value);
+      void mountZoomComponentView(json.value);
       if (mode === "student") {
         await fetch("/api/zoom/quick-actions", {
           method: "POST",
@@ -558,7 +784,7 @@ export function ZoomClassroom({
           <header className={styles.heading}>
             <p className={styles.eyebrow}>
               {data.offering.academyName} ·{" "}
-              {data.offering.isZoomLive ? "ZOOM LIVE CLASSROOM" : "CLASSROOM"}
+              {data.offering.isZoomLive ? "실시간 화상강의실" : "강의실"}
             </p>
             <h1>{data.offering.title}</h1>
             <p>
@@ -571,6 +797,30 @@ export function ZoomClassroom({
             </p>
           </header>
 
+          <div className={styles.statGrid}>
+            <div className={styles.statCard}>
+              <span className={styles.statLabel}>현재 수업 상태</span>
+              <strong className={styles.statValue}>
+                {currentSession.zoomMeeting
+                  ? (meetingStatusLabels[currentSession.zoomMeeting.status] ??
+                    currentSession.zoomMeeting.status)
+                  : "준비 중"}
+              </strong>
+            </div>
+            <div className={styles.statCard}>
+              <span className={styles.statLabel}>등록된 수업 자료</span>
+              <strong className={styles.statValue}>
+                {currentSession.materials.length}건
+              </strong>
+            </div>
+            <div className={styles.statCard}>
+              <span className={styles.statLabel}>다시보기 녹화본</span>
+              <strong className={styles.statValue}>
+                {currentSession.recordings.length}건
+              </strong>
+            </div>
+          </div>
+
           {data.sessions.length > 1 && (
             <section className={styles.panel}>
               <h2>수업 회차 선택</h2>
@@ -580,6 +830,7 @@ export function ZoomClassroom({
                   aria-label="수업 회차 선택"
                   value={currentSession.id}
                   onChange={(e) => {
+                    void unmountZoomComponentView();
                     setSelectedSessionId(e.target.value);
                     setTicket(null);
                     setPlayback(null);
@@ -749,33 +1000,112 @@ export function ZoomClassroom({
               </>
             )}
 
-            {ticket && (
+            <div
+              className={styles.studioStage}
+              data-testid="zoom-sdk-component-view"
+            >
+              <div className={styles.studioHeader}>
+                <strong>
+                  <span className={styles.studioDot} />
+                  Zoom Meeting SDK (Component View · 내장 화상강의실)
+                </strong>
+                <div className={styles.studioToolbar}>
+                  <button
+                    type="button"
+                    className={styles.studioButton}
+                    onClick={() => setSdkExpanded((prev) => !prev)}
+                  >
+                    {sdkExpanded ? "기본 화면 크기" : "와이드 화면 크기"}
+                  </button>
+                  {ticket?.sdk && (
+                    <button
+                      type="button"
+                      className={styles.studioButton}
+                      disabled={sdkMountState === "loading"}
+                      onClick={() => void mountZoomComponentView(ticket)}
+                    >
+                      {sdkMountState === "loading"
+                        ? "SDK 마운트 중…"
+                        : sdkMountState === "joined"
+                          ? "내장 강의실 다시 마운트"
+                          : "내장 강의실(Component View) 마운트"}
+                    </button>
+                  )}
+                  {(sdkMountState === "joined" ||
+                    sdkMountState === "initialized") && (
+                    <button
+                      type="button"
+                      className={styles.studioButton}
+                      onClick={() => void unmountZoomComponentView()}
+                    >
+                      내장 강의실 종료
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <p className={styles.studioMeta}>
+                {ticket?.sdk
+                  ? `회의 번호: ${ticket.sdk.meetingNumber} · 참가자: ${ticket.sdk.userName} · 권한: ${ticket.sdk.role === 1 ? "호스트(강사)" : "일반 참가자(학생)"} · 상태: ${
+                      sdkMountState === "joined"
+                        ? "실시간 내장 회의 연결됨"
+                        : sdkMountState === "initialized"
+                          ? "SDK Component View 마운트 준비 완료"
+                          : sdkMountState === "loading"
+                            ? "Zoom Meeting SDK 로딩 및 초기화 중…"
+                            : sdkMountState === "error"
+                              ? "SDK 연결 확인 필요"
+                              : "입장 대기 중"
+                    }`
+                  : `회차 회의 번호: ${currentSession.zoomMeeting?.zoomMeetingId || "동기화 대기"} · 마운트 컨테이너(#zoom-sdk-component-root) 준비 완료`}
+              </p>
+
               <div
-                className={styles.panel}
-                style={{ marginTop: "16px", background: "#f7f9fc" }}
+                className={`${styles.zoomSdkMountWrapper} ${sdkExpanded ? styles.zoomSdkMountExpanded : ""}`}
               >
+                {sdkMountState !== "joined" && (
+                  <div className={styles.zoomSdkPlaceholder}>
+                    <strong>
+                      {sdkMountState === "loading"
+                        ? "Zoom Meeting SDK (Component View)를 영역에 마운트하고 있습니다…"
+                        : sdkMountState === "initialized"
+                          ? "Zoom Meeting SDK Component View 영역이 초기화되었습니다"
+                          : sdkMountState === "error"
+                            ? "내장 강의실 연결 안내"
+                            : "플랫폼 내장 Zoom 화상강의실 영역 (#zoom-sdk-component-root)"}
+                    </strong>
+                    <p>
+                      {sdkErrorMsg
+                        ? `${sdkErrorMsg} (외부 Zoom 앱/브라우저 입장 버튼 또는 재마운트를 이용해 주세요.)`
+                        : ticket?.sdk
+                          ? ticket.isSimulatedMeeting
+                            ? "현재 내장 테스트 회의 번호 상태입니다. 아래에서 강사 Zoom OAuth 계정을 연결하면 실제 실시간 화상회의가 이 영역에 바로 임베드됩니다."
+                            : "상단의 「내장 강의실(Component View) 마운트」 버튼을 누르면 이 영역(div#zoom-sdk-component-root) 내부에서 실시간 화상수업이 실행됩니다."
+                          : role === "instructor"
+                            ? "상단의 「강의 시작 (Zoom 호스트 입장)」 버튼을 클릭하면 호스트 서명(JWT·ZAK) 발급과 함께 이 영역에 Zoom Component View가 마운트됩니다."
+                            : "상단의 「실시간 화상강의 참여」 버튼을 클릭하면 수강권 확인 후 이 영역에 Zoom Component View가 마운트됩니다."}
+                    </p>
+                  </div>
+                )}
+                <div
+                  id="zoom-sdk-component-root"
+                  ref={zoomSdkRootRef}
+                  className={styles.zoomSdkMountRoot}
+                  aria-label="Zoom Meeting SDK Component View 마운트 영역"
+                />
+              </div>
+            </div>
+
+            {ticket && (
+              <div className={styles.subPanel}>
                 <h3>
                   {ticket.role === "host"
                     ? "Zoom 호스트 강의실 연결 준비 완료"
                     : "Zoom 학생 강의실 연결 준비 완료"}
                 </h3>
                 <p>{ticket.sdkNotice}</p>
-                {ticket.sdk && (
-                  <div
-                    id="zoom-sdk-component-root"
-                    data-testid="zoom-sdk-component-view"
-                    className={styles.empty}
-                  >
-                    <strong>Zoom Meeting SDK (Component View)</strong>
-                    <p>
-                      회의 번호: {ticket.sdk.meetingNumber} · 참가자:{" "}
-                      {ticket.sdk.userName} · 권한:{" "}
-                      {ticket.sdk.role === 1 ? "호스트(강사)" : "일반 참가자(학생)"}
-                    </p>
-                  </div>
-                )}
                 {ticket.isSimulatedMeeting ? (
-                  <div className={styles.warning} style={{ marginTop: "12px" }}>
+                  <div className={styles.warning}>
                     <strong>
                       실제 Zoom 앱/웹 회의를 열려면 강사 개인 Zoom 계정 OAuth 연결이
                       필요합니다
@@ -802,13 +1132,23 @@ export function ZoomClassroom({
                   </div>
                 ) : (
                   <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.primary}
+                      disabled={sdkMountState === "loading"}
+                      onClick={() => void mountZoomComponentView(ticket)}
+                    >
+                      {sdkMountState === "joined"
+                        ? "내장 화상강의실(Component View) 재연결"
+                        : "내장 화상강의실(Component View)에서 바로 수업하기"}
+                    </button>
                     <a
                       href={ticket.externalJoinUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={styles.primary}
+                      className={styles.secondary}
                     >
-                      Zoom 앱 또는 브라우저로 실제 회의 입장 →
+                      외부 Zoom 앱 또는 새 창으로 열기 →
                     </a>
                   </div>
                 )}
@@ -1009,10 +1349,7 @@ export function ZoomClassroom({
             )}
 
             {playback && (
-              <div
-                className={styles.panel}
-                style={{ marginTop: "16px", background: "#f7f9fc" }}
-              >
+              <div className={styles.subPanel}>
                 <h3>다시보기 플레이어 · {playback.courseTitle}</h3>
                 <p>{playback.consentNotice}</p>
                 <p className={styles.note}>

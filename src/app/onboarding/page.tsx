@@ -12,7 +12,7 @@ export default async function Page() {
     : null;
   return (
     <main id="main-content" className="container page-content">
-      <span className="eyebrow">MY EDUON</span>
+      <span className="eyebrow">이용 공간 선택</span>
       <h1>나의 배움과 학원 운영</h1>
       <p>
         {user

@@ -26,7 +26,7 @@ export function DemoDialog({
         }}
       >
         <div className="dialog-inner">
-          <span className="eyebrow">EDUON PROTOTYPE</span>
+          <span className="eyebrow">EDUON 안내</span>
           <h2 id={id}>{title}</h2>
           {children}
           <form method="dialog">

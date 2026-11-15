@@ -108,7 +108,7 @@ export function AuthPanel({
   return (
     <main id="main-content" className="container">
       <section className={styles.auth}>
-        <p className={styles.eyebrow}>WELCOME TO EDUON</p>
+        <p className={styles.eyebrow}>EDUON 계정 인증</p>
         <h1>
           {mode === "signup"
             ? "새로운 배움을 시작하세요"

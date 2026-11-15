@@ -18,7 +18,7 @@ export default async function Academy({
     <main id="main-content" className="container page-content">
       <div className="page-heading">
         <span className="eyebrow">
-          MEET YOUR ACADEMY {isDemoMode() ? "· 가상 학원" : ""}
+          파트너 학원 소개 {isDemoMode() ? "· 가상 학원" : ""}
         </span>
         <h1>{a.name}</h1>
         <p>{a.intro}</p>

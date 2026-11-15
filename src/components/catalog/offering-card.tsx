@@ -18,7 +18,7 @@ export function OfferingCard({ offering: o }: { offering: PublicOffering }) {
       <div className={`course-art ${o.subject}`} aria-hidden="true">
         <div className="art-grid" />
         <span className="art-subject">
-          {o.subject === "math" ? "MATHEMATICS" : "ENGLISH"}
+          {o.subject === "math" ? "초·중등 수학" : "초·중등 영어"}
         </span>
         <span className="art-symbol">
           {o.subject === "math" ? "x² + y²" : "Aa"}

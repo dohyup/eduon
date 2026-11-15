@@ -36,8 +36,8 @@
 }
 .shell {
   display: grid;
-  grid-template-columns: 224px minmax(0, 1fr);
-  gap: 40px;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 32px;
   align-items: start;
 }
 .sidebar {
@@ -54,6 +54,7 @@
 }
 .identity strong {
   font-size: 14px;
+  font-weight: 600;
   display: block;
 }
 .identity small {
@@ -69,36 +70,40 @@
   height: 40px;
   background: #e8eef8;
   color: #2457a7;
-  border-radius: 12px;
-  font-weight: 800;
+  border-radius: 8px;
+  font-weight: 600;
 }
 .sidebar nav {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   margin: 20px 0;
 }
 .sidebar nav a {
   display: flex;
   justify-content: space-between;
-  padding: 12px 16px;
+  align-items: center;
+  padding: 8px 12px;
   border-radius: 8px;
-  min-height: 46px;
+  min-height: 36px;
   color: #526176;
   font-size: 14px;
   text-decoration: none;
+  transition:
+    background-color 150ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 150ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .sidebar nav a:hover,
 .sidebar nav a[aria-current="page"] {
   color: #2457a7;
   background: #eaf0fa;
-  font-weight: 700;
+  font-weight: 600;
 }
 .sidebar nav a span {
   font-size: 16px;
 }
 .sidebarNote {
-  padding: 24px 18px;
-  margin-top: 40px;
+  padding: 20px 16px;
+  margin-top: 32px;
   border: 1px solid #dbe4ef;
   border-radius: 12px;
   background: #f4f7fb;
@@ -106,14 +111,15 @@
 }
 .sidebarNote strong {
   color: #172b4d;
+  font-weight: 600;
 }
 .sidebarNote p {
   color: #667085;
-  line-height: 1.8;
-  margin: 10px 0 18px;
+  line-height: 1.75;
+  margin: 8px 0 16px;
 }
 .sidebarNote a {
-  font-weight: 700;
+  font-weight: 600;
   color: #2457a7;
   text-decoration: none;
 }
@@ -121,13 +127,14 @@
   min-width: 0;
 }
 .heading {
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 .heading h1 {
   font-size: 28px;
-  letter-spacing: -1px;
-  line-height: 1.4;
-  margin: 7px 0 10px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  margin: 8px 0;
   color: #172b4d;
 }
 .heading p {
@@ -137,10 +144,10 @@
   margin: 0;
 }
 .eyebrow {
-  font-size: 11px !important;
-  letter-spacing: 1.6px;
+  font-size: 12px !important;
+  letter-spacing: 0.01em;
   color: #2457a7 !important;
-  font-weight: 800;
+  font-weight: 500;
 }
 .childPicker {
   display: flex;
@@ -149,17 +156,17 @@
   margin: 0 0 24px;
   padding: 12px 16px;
   border: 1px solid #e4e9f0;
-  border-radius: 10px;
+  border-radius: 12px;
   background: white;
 }
 .childPicker label {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .childPicker select {
   border: 1px solid #7a8699;
-  min-height: 44px;
-  border-radius: 6px;
+  min-height: 40px;
+  border-radius: 8px;
   background: white;
   padding: 8px;
   font: inherit;
@@ -178,7 +185,8 @@
   border: 1px solid #e4e9f0;
   background: white;
   border-radius: 12px;
-  margin-bottom: 26px;
+  margin-bottom: 24px;
+  font-variant-numeric: tabular-nums;
 }
 .stat {
   padding: 20px 24px;
@@ -195,9 +203,9 @@
 .stat strong {
   display: block;
   color: #172b4d;
-  font-size: 25px;
+  font-size: 24px;
   margin-top: 8px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .stat small {
   font-size: 13px;
@@ -220,21 +228,23 @@
   margin-bottom: 20px;
 }
 .panel h2 {
-  font-size: 17px;
-  line-height: 1.5;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
   color: #172b4d;
-  margin: 0 0 18px;
-  letter-spacing: -0.3px;
+  margin: 0 0 16px;
+  letter-spacing: -0.02em;
 }
 .panel h3 {
   font-size: 16px;
+  font-weight: 600;
   color: #172b4d;
-  margin: 12px 0 6px;
+  margin: 12px 0 8px;
   line-height: 1.5;
 }
 .panel p {
   font-size: 14px;
-  line-height: 1.8;
+  line-height: 1.75;
   color: #667085;
   margin: 8px 0 16px;
 }
@@ -251,13 +261,13 @@
 .chip {
   display: inline-flex;
   align-items: center;
-  padding: 4px 9px;
+  padding: 4px 8px;
   background: #edf3fb;
-  border-radius: 5px;
+  border-radius: 6px;
   color: #2457a7;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.7;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
 }
 .green {
   color: #217a60;
@@ -270,7 +280,7 @@
 .schedule {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   margin: 20px 0;
 }
 .date {
@@ -278,14 +288,16 @@
   border-radius: 8px;
   min-width: 52px;
   text-align: center;
-  padding: 9px 8px;
+  padding: 8px;
   font-size: 12px;
-  line-height: 1.7;
+  line-height: 1.6;
   color: #667085;
+  font-variant-numeric: tabular-nums;
 }
 .date strong {
   display: block;
   font-size: 20px;
+  font-weight: 600;
   color: #172b4d;
 }
 .schedule p {
@@ -294,20 +306,23 @@
 }
 .action {
   display: inline-flex;
-  min-height: 44px;
+  min-height: 40px;
   align-items: center;
   justify-content: center;
   gap: 8px;
   border: 1px solid #2457a7;
   background: #2457a7;
   color: white;
-  font-weight: 650;
+  font-weight: 600;
   font-size: 13px;
-  padding: 10px 16px;
+  padding: 8px 16px;
   border-radius: 8px;
   text-decoration: none;
   cursor: pointer;
-  line-height: 1.6;
+  line-height: 1.5;
+  transition:
+    background-color 150ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 150ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .action:hover {
   background: #1c4689;

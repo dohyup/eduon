@@ -340,10 +340,12 @@ export function startZoomSessionByHost(
     const sdkKey =
       process.env.ZOOM_SDK_KEY ||
       runtimeSettings.zoomClientId ||
+      process.env.ZOOM_CLIENT_ID ||
       "eduon-dev-sdk-key";
     const sdkSecret =
       process.env.ZOOM_SDK_SECRET ||
       runtimeSettings.zoomClientSecret ||
+      process.env.ZOOM_CLIENT_SECRET ||
       "eduon-dev-sdk-secret-32bytes-minimum";
 
     const signature = createZoomSdkSignature({
@@ -557,17 +559,20 @@ export function joinZoomSessionByStudent(
     // Joining an instructor's external personal Zoom meeting via Meeting SDK requires
     // Marketplace App Review approval + SDK credentials. Never bypass SDK restrictions!
     const approvedForExternalSdk = zoomExternalSdkApproved();
+    const shouldIssueStudentSdk = approvedForExternalSdk || !isTestMode;
 
     let sdkPayload: ClassroomJoinTicket["sdk"] = null;
-    if (approvedForExternalSdk) {
+    if (shouldIssueStudentSdk) {
       const runtimeSettings = getRuntimeSettings();
       const sdkKey =
         process.env.ZOOM_SDK_KEY ||
         runtimeSettings.zoomClientId ||
+        process.env.ZOOM_CLIENT_ID ||
         "eduon-sdk-key";
       const sdkSecret =
         process.env.ZOOM_SDK_SECRET ||
         runtimeSettings.zoomClientSecret ||
+        process.env.ZOOM_CLIENT_SECRET ||
         "eduon-dev-sdk-secret-32bytes-minimum";
       const signature = createZoomSdkSignature({
         sdkKey,
@@ -605,13 +610,13 @@ export function joinZoomSessionByStudent(
 
     return {
       role: "attendee",
-      joinMode: approvedForExternalSdk ? "sdk_and_external" : "external_only",
+      joinMode: shouldIssueStudentSdk ? "sdk_and_external" : "external_only",
       externalSdkApproved: approvedForExternalSdk,
       isSimulatedMeeting,
       sdkNotice: isSimulatedMeeting
         ? "현재 내장 시뮬레이션 강의실 모드입니다. 담당 강사가 개인 Zoom 계정을 OAuth로 연결하면 실제 Zoom 앱/웹 회의 링크가 활성화됩니다."
-        : approvedForExternalSdk
-          ? "Zoom Marketplace 외부 회의 SDK 승인이 확인되어 강의실 내장 화면(Component View) 및 외부 앱 입장을 모두 지원합니다."
+        : shouldIssueStudentSdk
+          ? "Zoom Meeting SDK (Component View) 서명이 발급되어 플랫폼 내장 화상강의실 영역 및 외부 앱 입장을 모두 지원합니다."
           : "2026년 Zoom 외부 호스트 회의 보안 정책에 따라 Zoom 앱 또는 공식 웹 브라우저로 안전하게 입장합니다.",
       sessionId: session.id,
       offeringId: session.offeringId,

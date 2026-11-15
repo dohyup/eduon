@@ -4,11 +4,11 @@ export default function Teach() {
   return (
     <main id="main-content" className="container page-content">
       <div className="teach-hero">
-        <span className="eyebrow">A NEW CHAPTER FOR YOUR ACADEMY</span>
+        <span className="eyebrow">파트너 학원 입점 안내</span>
         <h1>
-          가르침에 집중하세요.
+          가르침에 집중하세요
           <br />
-          연결은 EDUON이 준비합니다.
+          연결은 EDUON이 준비합니다
         </h1>
         <p>
           동네에서 쌓은 교육의 깊이가,
@@ -28,7 +28,7 @@ export default function Teach() {
         {["학원 정보 등록", "운영자 검토·승인", "수업 개설·학생 연결"].map(
           (s, i) => (
             <div key={s} className="panel">
-              <span className="eyebrow">STEP 0{i + 1}</span>
+              <span className="eyebrow">0{i + 1}단계</span>
               <h2>{s}</h2>
               <p className="muted">
                 {

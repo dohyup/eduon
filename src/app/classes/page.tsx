@@ -41,7 +41,7 @@ export default async function Classes({
   return (
     <main id="main-content" className="container page-content">
       <div className="page-heading">
-        <span className="eyebrow">FIND YOUR CLASS</span>
+        <span className="eyebrow">실시간 화상수업 탐색</span>
         <h1>아이의 속도에 맞는 배움</h1>
         <p className="muted">
           과목과 수준, 일정을 살펴보고 우리 아이에게 맞는 수업을 찾아보세요.

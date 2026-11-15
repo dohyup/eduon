@@ -26,7 +26,7 @@ export default async function Home() {
             <h1>
               우리 아이에게 맞는 수업,
               <br />
-              <span>믿을 수 있는 학원에서.</span>
+              <span>믿을 수 있는 학원에서</span>
             </h1>
             <p>
               동네 학원의 세심한 가르침을, 이제 어디서나.
@@ -40,36 +40,25 @@ export default async function Home() {
               </Link>
               <Link className="hero-text-link" href="/teach">
                 학원을 운영하시나요?
-                <ArrowUpRight size={17} />
+                <ArrowUpRight size={16} />
               </Link>
             </div>
             <div className="hero-checks">
               <span>
-                <Check size={15} />
+                <Check size={16} />
                 수준에 맞는 소그룹
               </span>
               <span>
-                <Check size={15} />
+                <Check size={16} />
                 실시간 온라인 수업
               </span>
             </div>
           </div>
           <div className="hero-visual" aria-label="학생의 배움 일정 예시">
-            <div className="orbit orbit-one" />
-            <div className="orbit orbit-two" />
-            <div className="learning-note">
-              <span className="note-icon">
-                <BookOpen size={21} />
-              </span>
-              <div>
-                <strong>조금씩, 나답게 성장하는 중</strong>
-                <small>한 번의 이해가 다음 배움의 시작이 됩니다.</small>
-              </div>
-            </div>
             <div className="schedule-card">
               <div className="schedule-top">
                 <div>
-                  <span className="eyebrow">MY LEARNING</span>
+                  <span className="eyebrow">오늘의 수업 일정</span>
                   <h2>오늘의 배움</h2>
                 </div>
                 <span className="badge green">예시 일정</span>
@@ -93,24 +82,15 @@ export default async function Home() {
                   <p>이음수학 배움교실</p>
                 </div>
                 <span className="lesson-arrow">
-                  <ArrowUpRight size={20} />
+                  <ArrowUpRight size={18} />
                 </span>
               </div>
               <div className="schedule-bottom">
                 <span>
-                  <Video size={15} />
+                  <Video size={16} />
                   집에서도 선생님과 함께
                 </span>
-                <span>DEMO</span>
-              </div>
-            </div>
-            <div className="growth-note">
-              <span>매일의 작은 이해가</span>
-              <strong>더 큰 가능성으로.</strong>
-              <div className="growth-bars">
-                {[20, 30, 25, 44, 38, 60, 72].map((h, i) => (
-                  <i key={i} style={{ height: h }} />
-                ))}
+                <span>실시간 화상</span>
               </div>
             </div>
           </div>
@@ -119,21 +99,21 @@ export default async function Home() {
       <section className="values-strip">
         <div className="container values-grid">
           <div>
-            <Search />
+            <Search size={18} />
             <span>
               <strong>아이에게 맞게</strong>
               <small>과목·학년·수준별 탐색</small>
             </span>
           </div>
           <div>
-            <Video />
+            <Video size={18} />
             <span>
               <strong>거리의 제약 없이</strong>
               <small>지역을 넘어 만나는 선생님</small>
             </span>
           </div>
           <div>
-            <ShieldCheck />
+            <ShieldCheck size={18} />
             <span>
               <strong>배움의 과정까지</strong>
               <small>수업·과제·피드백을 한곳에서</small>
@@ -144,7 +124,7 @@ export default async function Home() {
       <section className="section container">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">FIND YOUR NEXT CLASS</span>
+            <span className="eyebrow">모집 중인 실시간 수업</span>
             <h2>아이의 다음 배움을 찾아보세요</h2>
             <p className="muted">
               기초를 다지는 수학부터, 생각을 넓히는 영어까지.
@@ -152,7 +132,7 @@ export default async function Home() {
           </div>
           <Link className="text-link" href="/classes">
             전체 수업 보기
-            <ArrowRight size={17} />
+            <ArrowRight size={16} />
           </Link>
         </div>
         <div className="course-grid">
@@ -170,8 +150,8 @@ export default async function Home() {
       </section>
       <section className="steps-section">
         <div className="container">
-          <span className="eyebrow">A SIMPLE START</span>
-          <h2>좋은 배움의 시작은, 어렵지 않게.</h2>
+          <span className="eyebrow">수강 시작 안내</span>
+          <h2>좋은 배움의 시작은, 어렵지 않게</h2>
           <div className="steps-grid">
             {[
               {
@@ -192,7 +172,7 @@ export default async function Home() {
             ].map((s, i) => (
               <div className="step" key={s.title}>
                 <span className="step-no">0{i + 1}</span>
-                <s.icon size={25} />
+                <s.icon size={20} />
                 <h3>{s.title}</h3>
                 <p>{s.text}</p>
               </div>
@@ -203,10 +183,10 @@ export default async function Home() {
       <section className="container section">
         <div className="academy-cta">
           <div>
-            <span className="eyebrow">FOR ACADEMIES</span>
+            <span className="eyebrow">파트너 학원 입점</span>
             <h2>
               좋은 가르침이,
-              <br />더 많은 아이를 만날 수 있도록.
+              <br />더 많은 아이를 만날 수 있도록
             </h2>
             <p>
               온라인 수업 개설부터 수강생 관리까지.
@@ -215,15 +195,15 @@ export default async function Home() {
             </p>
             <Link href="/teach" className="button">
               학원 입점 알아보기
-              <ArrowRight size={17} />
+              <ArrowRight size={16} />
             </Link>
           </div>
           <div className="cta-illustration" aria-hidden="true">
-            <BookOpen size={100} strokeWidth={1} />
+            <BookOpen size={80} strokeWidth={1.25} />
             <span>
-              LOCAL EXPERTISE.
+              지역 학원의 깊이 있는 수업을
               <br />
-              BOUNDLESS LEARNING.
+              온라인 교실로 연결합니다
             </span>
           </div>
         </div>

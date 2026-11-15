@@ -20,12 +20,12 @@ type Child = {
 type ZoomAccountState = {
   connected: boolean;
   status:
-    | "connected"
-    | "expired"
-    | "reauth_required"
-    | "disconnected"
-    | "error"
-    | "unlinked";
+  | "connected"
+  | "expired"
+  | "reauth_required"
+  | "disconnected"
+  | "error"
+  | "unlinked";
   zoomUserId: string | null;
   maskedEmail: string | null;
   displayName: string | null;
@@ -654,17 +654,17 @@ export function LiveWorkspace({
   const instructorOptions =
     me && academyId
       ? [
-          {
-            academyId,
-            userId: me.user.id,
-            email: me.user.email,
-            role: "owner",
-          },
-          ...(me.instructors ?? []).filter(
-            (member) =>
-              member.academyId === academyId && member.userId !== me.user.id,
-          ),
-        ]
+        {
+          academyId,
+          userId: me.user.id,
+          email: me.user.email,
+          role: "owner",
+        },
+        ...(me.instructors ?? []).filter(
+          (member) =>
+            member.academyId === academyId && member.userId !== me.user.id,
+        ),
+      ]
       : [];
   const disabled = Boolean(busy);
   const ready = Boolean(me);
@@ -737,7 +737,15 @@ export function LiveWorkspace({
       </div>
       <div className={styles.shell}>
         <nav className={styles.nav} aria-label={`${meta.name} 업무 메뉴`}>
-          <div className={styles.navTitle}>{meta.name} 공간</div>
+          <div className={styles.sidebarIdentity}>
+            <span className={styles.sidebarAvatar} aria-hidden="true">
+              {meta.name.slice(0, 1)}
+            </span>
+            <div>
+              <strong>{meta.name} 공간</strong>
+              <small>{me ? me.user.email : "계정 연결 확인 중"}</small>
+            </div>
+          </div>
           {meta.nav.map(([name, href]) => (
             <Link
               key={href}
@@ -762,7 +770,7 @@ export function LiveWorkspace({
         </nav>
         <div className={styles.body}>
           <header className={styles.heading}>
-            <p className={styles.eyebrow}>MY EDUON</p>
+            <p className={styles.eyebrow}>{meta.name} 업무 공간</p>
             <h1>{meta.title}</h1>
             <p>{meta.description}</p>
           </header>
@@ -969,7 +977,32 @@ export function LiveWorkspace({
                 <>
                   {me.student ? (
                     <>
-                      <Panel title="나의 학생 프로필">
+                      {studentOverview && (
+                        <div className={styles.statGrid}>
+                          <div className={styles.statCard}>
+                            <span className={styles.statLabel}>수강 중인 수업</span>
+                            <strong className={styles.statValue}>
+                              {studentOverview.enrollments.length}
+                              <small>과목</small>
+                            </strong>
+                          </div>
+                          <div className={styles.statCard}>
+                            <span className={styles.statLabel}>평균 출석률</span>
+                            <strong className={styles.statValue}>
+                              {studentOverview.overallAttendanceRate}
+                              <small>%</small>
+                            </strong>
+                          </div>
+                          <div className={styles.statCard}>
+                            <span className={styles.statLabel}>누적 참여시간</span>
+                            <strong className={styles.statValue}>
+                              {studentOverview.totalParticipatedMinutes}
+                              <small>분</small>
+                            </strong>
+                          </div>
+                        </div>
+                      )}
+                      <Panel title="나의 학생 프로필 및 수강 수업">
                         <div className={styles.row}>
                           <div>
                             <h3>{me.student.name}</h3>
@@ -987,7 +1020,7 @@ export function LiveWorkspace({
                           )}
                         </div>
                         {studentOverview &&
-                        studentOverview.enrollments.length > 0 ? (
+                          studentOverview.enrollments.length > 0 ? (
                           <ul className={styles.list}>
                             {studentOverview.enrollments.map((item) => (
                               <li key={item.enrollmentId}>
@@ -1009,21 +1042,28 @@ export function LiveWorkspace({
                                   </Link>
                                 </div>
                                 {item.sessions.map((session, sIdx) => (
-                                  <p className={styles.note} key={session.id}>
-                                    {sIdx + 1}회차:{" "}
-                                    {new Intl.DateTimeFormat("ko-KR", {
-                                      timeZone: "Asia/Seoul",
-                                      dateStyle: "medium",
-                                      timeStyle: "short",
-                                    }).format(new Date(session.startsAt))}{" "}
-                                    · 출석:{" "}
-                                    {session.attendance
-                                      ? `${session.attendance.status === "present" ? "출석" : session.attendance.status === "late" ? "지각" : "결석"} (${session.attendance.attendanceRate}%)`
-                                      : "집계 전"}{" "}
-                                    {session.publicRecordings.length > 0
-                                      ? `· 다시보기 ${session.publicRecordings.length}건 제공`
-                                      : ""}
-                                  </p>
+                                  <div
+                                    className={styles.sessionRow}
+                                    key={session.id}
+                                  >
+                                    <span>
+                                      {sIdx + 1}회차 ·{" "}
+                                      {new Intl.DateTimeFormat("ko-KR", {
+                                        timeZone: "Asia/Seoul",
+                                        dateStyle: "medium",
+                                        timeStyle: "short",
+                                      }).format(new Date(session.startsAt))}
+                                    </span>
+                                    <span className={styles.badge}>
+                                      출석:{" "}
+                                      {session.attendance
+                                        ? `${session.attendance.status === "present" ? "출석" : session.attendance.status === "late" ? "지각" : "결석"} (${session.attendance.attendanceRate}%)`
+                                        : "집계 전"}
+                                      {session.publicRecordings.length > 0
+                                        ? ` · 다시보기 ${session.publicRecordings.length}건`
+                                        : ""}
+                                    </span>
+                                  </div>
                                 ))}
                               </li>
                             ))}
@@ -1034,9 +1074,11 @@ export function LiveWorkspace({
                             현재 활성 수강권이나 화상수업을 제공하지 않습니다.
                           </p>
                         )}
-                        <Link className={styles.secondary} href="/classes">
-                          공개 수업 찾기
-                        </Link>
+                        <div className={styles.actions}>
+                          <Link className={styles.secondary} href="/classes">
+                            공개 수업 찾기
+                          </Link>
+                        </div>
                       </Panel>
                     </>
                   ) : (
@@ -1046,76 +1088,106 @@ export function LiveWorkspace({
               )}
               {(role === "owner" || role === "instructor") &&
                 me.memberships.length > 0 && (
-                  <Panel title="내 Zoom 계정 연결">
-                    <div className={styles.row}>
-                      <div>
-                        <h3>
-                          {zoomAccount?.connected
-                            ? `${zoomAccount.displayName || "Zoom 강사"} (${zoomAccount.maskedEmail || zoomAccount.zoomUserId})`
-                            : "연결된 Zoom 계정이 없습니다"}
-                        </h3>
-                        <p>
-                          상태:{" "}
-                          {zoomStatusText[zoomAccount?.status || "unlinked"] ??
-                            zoomAccount?.status}{" "}
-                          {zoomAccount?.connected &&
-                            `· 클라우드 녹화: ${zoomAccount.cloudRecordingAllowed ? "지원 (유료 계정)" : "미지원 (기본 계정)"}`}
-                        </p>
+                  <>
+                    <div className={styles.statGrid}>
+                      <div className={styles.statCard}>
+                        <span className={styles.statLabel}>
+                          {role === "owner" ? "등록된 수업" : "담당 수업"}
+                        </span>
+                        <strong className={styles.statValue}>
+                          {offerings.length}개
+                        </strong>
                       </div>
-                      <span className={styles.badge}>
-                        {zoomStatusText[zoomAccount?.status || "unlinked"]}
-                      </span>
+                      <div className={styles.statCard}>
+                        <span className={styles.statLabel}>Zoom 연동 상태</span>
+                        <strong className={styles.statValue}>
+                          {zoomStatusText[zoomAccount?.status || "unlinked"]}
+                        </strong>
+                      </div>
+                      <div className={styles.statCard}>
+                        <span className={styles.statLabel}>
+                          예정된 화상수업 회차
+                        </span>
+                        <strong className={styles.statValue}>
+                          {offerings.reduce(
+                            (acc, o) => acc + o.sessions.length,
+                            0,
+                          )}
+                          회
+                        </strong>
+                      </div>
                     </div>
-                    {zoomAccount?.lastErrorMessage && (
-                      <div className={styles.warning} role="alert">
-                        <strong>Zoom 연동 안내</strong>
-                        <p>{zoomAccount.lastErrorMessage}</p>
+                    <Panel title="내 Zoom 계정 연결">
+                      <div className={styles.row}>
+                        <div>
+                          <h3>
+                            {zoomAccount?.connected
+                              ? `${zoomAccount.displayName || "Zoom 강사"} (${zoomAccount.maskedEmail || zoomAccount.zoomUserId})`
+                              : "연결된 Zoom 계정이 없습니다"}
+                          </h3>
+                          <p>
+                            상태:{" "}
+                            {zoomStatusText[zoomAccount?.status || "unlinked"] ??
+                              zoomAccount?.status}{" "}
+                            {zoomAccount?.connected &&
+                              `· 클라우드 녹화: ${zoomAccount.cloudRecordingAllowed ? "지원 (유료 계정)" : "미지원 (기본 계정)"}`}
+                          </p>
+                        </div>
+                        <span className={styles.badge}>
+                          {zoomStatusText[zoomAccount?.status || "unlinked"]}
+                        </span>
                       </div>
-                    )}
-                    <div className={styles.actions}>
-                      {!zoomAccount?.connected ? (
-                        <button
-                          type="button"
-                          className={styles.primary}
-                          disabled={disabled}
-                          onClick={() => void connectZoomAccount()}
-                        >
-                          {busy === "zoom-connect"
-                            ? "Zoom 연결 중…"
-                            : zoomAccount?.status === "disconnected" ||
-                                zoomAccount?.status === "reauth_required"
-                              ? "Zoom 계정 재연결"
-                              : "Zoom 계정 연결"}
-                        </button>
-                      ) : (
-                        <>
+                      {zoomAccount?.lastErrorMessage && (
+                        <div className={styles.warning} role="alert">
+                          <strong>Zoom 연동 안내</strong>
+                          <p>{zoomAccount.lastErrorMessage}</p>
+                        </div>
+                      )}
+                      <div className={styles.actions}>
+                        {!zoomAccount?.connected ? (
                           <button
                             type="button"
-                            className={styles.secondary}
+                            className={styles.primary}
                             disabled={disabled}
                             onClick={() => void connectZoomAccount()}
                           >
-                            Zoom 계정 재연결
+                            {busy === "zoom-connect"
+                              ? "Zoom 연결 중…"
+                              : zoomAccount?.status === "disconnected" ||
+                                zoomAccount?.status === "reauth_required"
+                                ? "Zoom 계정 재연결"
+                                : "Zoom 계정 연결"}
                           </button>
-                          <button
-                            type="button"
-                            className={styles.secondary}
-                            disabled={disabled}
-                            onClick={() =>
-                              void mutate(
-                                "zoom-disconnect",
-                                "/api/zoom/account",
-                                { action: "disconnect" },
-                                "Zoom 계정 연결을 해제했습니다.",
-                              )
-                            }
-                          >
-                            Zoom 계정 연결 해제
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </Panel>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className={styles.secondary}
+                              disabled={disabled}
+                              onClick={() => void connectZoomAccount()}
+                            >
+                              Zoom 계정 재연결
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.secondary}
+                              disabled={disabled}
+                              onClick={() =>
+                                void mutate(
+                                  "zoom-disconnect",
+                                  "/api/zoom/account",
+                                  { action: "disconnect" },
+                                  "Zoom 계정 연결을 해제했습니다.",
+                                )
+                              }
+                            >
+                              Zoom 계정 연결 해제
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </Panel>
+                  </>
                 )}
               {role === "owner" && (
                 <>
@@ -1411,15 +1483,15 @@ export function LiveWorkspace({
                                     ],
                                     ...(isZoom
                                       ? {
-                                          isZoomLive: true,
-                                          zoomWaitingRoom:
-                                            data.get("zoomWaitingRoom") ===
-                                            "true",
-                                          zoomAutoRecording: String(
-                                            data.get("zoomAutoRecording") ||
-                                              "none",
-                                          ),
-                                        }
+                                        isZoomLive: true,
+                                        zoomWaitingRoom:
+                                          data.get("zoomWaitingRoom") ===
+                                          "true",
+                                        zoomAutoRecording: String(
+                                          data.get("zoomAutoRecording") ||
+                                          "none",
+                                        ),
+                                      }
                                       : {}),
                                     sessions: [
                                       {
@@ -1447,8 +1519,8 @@ export function LiveWorkspace({
                                   onChange={(e) =>
                                     setDeliveryType(
                                       e.target.value as
-                                        | "standard"
-                                        | "zoom_live",
+                                      | "standard"
+                                      | "zoom_live",
                                     )
                                   }
                                 >
@@ -1461,7 +1533,7 @@ export function LiveWorkspace({
                                 </select>
                               </label>
                               {deliveryType === "zoom_live" && (
-                                <div className={styles.panel}>
+                                <div className={styles.subPanel}>
                                   <h3>Zoom 라이브 강의 설정</h3>
                                   <p>
                                     Zoom 계정 연결 상태:{" "}
@@ -1684,18 +1756,27 @@ export function LiveWorkspace({
                             </p>
                             {offering.sessions.map((session, index) => (
                               <div key={session.startsAt}>
-                                <p className={styles.note}>
-                                  {index + 1}회:{" "}
-                                  {new Intl.DateTimeFormat("ko-KR", {
-                                    timeZone: "Asia/Seoul",
-                                    dateStyle: "medium",
-                                    timeStyle: "short",
-                                  }).format(new Date(session.startsAt))}{" "}
-                                  (Asia/Seoul)
-                                  {session.zoomMeeting
-                                    ? ` · ${zoomStatusText[session.zoomMeeting.status] ?? session.zoomMeeting.status}${session.zoomMeeting.zoomMeetingId ? ` (#${session.zoomMeeting.zoomMeetingId})` : ""}`
-                                    : ""}
-                                </p>
+                                <div className={styles.sessionRow}>
+                                  <span>
+                                    {index + 1}회 ·{" "}
+                                    {new Intl.DateTimeFormat("ko-KR", {
+                                      timeZone: "Asia/Seoul",
+                                      dateStyle: "medium",
+                                      timeStyle: "short",
+                                    }).format(new Date(session.startsAt))}{" "}
+                                    (Asia/Seoul)
+                                  </span>
+                                  {session.zoomMeeting && (
+                                    <span className={styles.badge}>
+                                      {zoomStatusText[
+                                        session.zoomMeeting.status
+                                      ] ?? session.zoomMeeting.status}
+                                      {session.zoomMeeting.zoomMeetingId
+                                        ? ` (#${session.zoomMeeting.zoomMeetingId})`
+                                        : ""}
+                                    </span>
+                                  )}
+                                </div>
                                 {session.zoomMeeting?.syncError && (
                                   <p className={styles.note}>
                                     안내: {session.zoomMeeting.syncError}
@@ -1891,7 +1972,7 @@ export function LiveWorkspace({
                                 {
                                   zoomMode:
                                     cid &&
-                                    (csec || adminSettings?.hasClientSecret)
+                                      (csec || adminSettings?.hasClientSecret)
                                       ? "live"
                                       : selectedMode,
                                   zoomAccountId: accId,
@@ -1933,7 +2014,7 @@ export function LiveWorkspace({
                                   name="zoomClientId"
                                   defaultValue={
                                     adminSettings?.zoomClientId ===
-                                    "live-client-id"
+                                      "live-client-id"
                                       ? ""
                                       : (adminSettings?.zoomClientId ?? "")
                                   }
@@ -2198,11 +2279,11 @@ export function LiveWorkspace({
                               <strong>현재 활성 관리자 목록:</strong>{" "}
                               {adminOperators.admins.length
                                 ? adminOperators.admins
-                                    .map(
-                                      (a) =>
-                                        `${a.email}${a.fromEnvConfig ? " (환경변수 고정)" : ""}`,
-                                    )
-                                    .join(", ")
+                                  .map(
+                                    (a) =>
+                                      `${a.email}${a.fromEnvConfig ? " (환경변수 고정)" : ""}`,
+                                  )
+                                  .join(", ")
                                 : "없음"}
                             </div>
                           )}
@@ -2250,9 +2331,9 @@ export function LiveWorkspace({
                                 onChange={(e) =>
                                   setOperatorAction(
                                     e.target.value as
-                                      | "grant"
-                                      | "replace"
-                                      | "revoke",
+                                    | "grant"
+                                    | "replace"
+                                    | "revoke",
                                   )
                                 }
                               >
@@ -2317,31 +2398,43 @@ export function LiveWorkspace({
                           <Panel title="Zoom 화상강의 통합 운영 현황">
                             <div className={styles.statusSummary}>
                               <span>
-                                연결 강사:{" "}
-                                {adminZoom.summary.connectedInstructorsCount}명
+                                연결 강사
+                                <strong>
+                                  {adminZoom.summary.connectedInstructorsCount}명
+                                </strong>
                               </span>
                               <span>
-                                재인증 필요:{" "}
-                                {adminZoom.summary.reauthRequiredCount}명
+                                재인증 필요
+                                <strong>
+                                  {adminZoom.summary.reauthRequiredCount}명
+                                </strong>
                               </span>
                               <span>
-                                예약·진행 회의:{" "}
-                                {adminZoom.summary.scheduledMeetingsCount}건
+                                예약·진행 회의
+                                <strong>
+                                  {adminZoom.summary.scheduledMeetingsCount}건
+                                </strong>
                               </span>
                               <span>
-                                동기화 오류·검토:{" "}
-                                {adminZoom.summary.syncFailedMeetingsCount +
-                                  adminZoom.summary
-                                    .needsAdminReviewMeetingsCount}
-                                건
+                                동기화 오류·검토
+                                <strong>
+                                  {adminZoom.summary.syncFailedMeetingsCount +
+                                    adminZoom.summary
+                                      .needsAdminReviewMeetingsCount}
+                                  건
+                                </strong>
                               </span>
                               <span>
-                                실패 웹훅:{" "}
-                                {adminZoom.summary.failedWebhooksCount}건
+                                실패 웹훅
+                                <strong>
+                                  {adminZoom.summary.failedWebhooksCount}건
+                                </strong>
                               </span>
                               <span>
-                                녹화 파일:{" "}
-                                {adminZoom.summary.totalRecordingsCount}건
+                                녹화 파일
+                                <strong>
+                                  {adminZoom.summary.totalRecordingsCount}건
+                                </strong>
                               </span>
                             </div>
                             {adminZoom.summary.failedWebhooksCount > 0 && (
@@ -2376,7 +2469,7 @@ export function LiveWorkspace({
                                           · 상태:{" "}
                                           {
                                             zoomStatusText[
-                                              item.account.status
+                                            item.account.status
                                             ]
                                           }
                                         </p>

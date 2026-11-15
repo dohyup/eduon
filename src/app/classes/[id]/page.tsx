@@ -135,7 +135,7 @@ export default async function Detail({
           </div>
         </section>
         <aside className="booking-panel">
-          <span className="eyebrow">CLASS INFORMATION</span>
+          <span className="eyebrow">수업 신청 안내</span>
           <h2>함께 시작하는 배움</h2>
           <dl>
             <div>
@@ -182,7 +182,7 @@ export default async function Detail({
               <p className="caption">실제 결제 및 수강 불가</p>
             </>
           ) : (
-            <div style={{ display: "grid", gap: "10px" }}>
+            <div className="stack">
               <Link className="button" href={`/learn/classes/${o.id}`}>
                 학생 Zoom 실시간 강의실 입장 →
               </Link>

@@ -109,7 +109,7 @@ export function Workspace({
   return (
     <WorkspaceShell role={role}>
       <header className={styles.heading}>
-        <p className={styles.eyebrow}>MY EDUON / {roleMeta.name}</p>
+        <p className={styles.eyebrow}>{roleMeta.name} 업무 공간</p>
         <h1>{title}</h1>
         <p>{roleMeta.description}</p>
       </header>
@@ -696,7 +696,7 @@ export function AccountDemo({
   return (
     <main id="main-content" className="container">
       <div className={styles.auth}>
-        <p className={styles.eyebrow}>WELCOME TO EDUON</p>
+        <p className={styles.eyebrow}>EDUON 안내</p>
         <h1>{titles[mode]}</h1>
         <p>
           지금은 반응형 프로토타입입니다. 개인정보 입력 없이 역할별 화면을
