@@ -68,10 +68,10 @@
   place-items: center;
   width: 40px;
   height: 40px;
-  background: #e8eef8;
-  color: #2457a7;
-  border-radius: 8px;
-  font-weight: 600;
+  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  color: #ffffff;
+  border-radius: 10px;
+  font-weight: 800;
 }
 .sidebar nav {
   display: grid;
@@ -83,9 +83,9 @@
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  border-radius: 8px;
-  min-height: 36px;
-  color: #526176;
+  border-radius: 10px;
+  min-height: 38px;
+  color: #475569;
   font-size: 14px;
   text-decoration: none;
   transition:
@@ -94,9 +94,9 @@
 }
 .sidebar nav a:hover,
 .sidebar nav a[aria-current="page"] {
-  color: #2457a7;
-  background: #eaf0fa;
-  font-weight: 600;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-weight: 700;
 }
 .sidebar nav a span {
   font-size: 16px;
@@ -104,23 +104,23 @@
 .sidebarNote {
   padding: 20px 16px;
   margin-top: 32px;
-  border: 1px solid #dbe4ef;
-  border-radius: 12px;
-  background: #f4f7fb;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  background: #eff6ff;
   font-size: 13px;
 }
 .sidebarNote strong {
-  color: #172b4d;
-  font-weight: 600;
+  color: #0f172a;
+  font-weight: 700;
 }
 .sidebarNote p {
-  color: #667085;
+  color: #334155;
   line-height: 1.75;
   margin: 8px 0 16px;
 }
 .sidebarNote a {
-  font-weight: 600;
-  color: #2457a7;
+  font-weight: 700;
+  color: #1d4ed8;
   text-decoration: none;
 }
 .body {
@@ -131,42 +131,43 @@
 }
 .heading h1 {
   font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 800;
+  letter-spacing: -0.025em;
   line-height: 1.35;
   margin: 8px 0;
-  color: #172b4d;
+  color: #0f172a;
 }
 .heading p {
-  color: #667085;
+  color: #475569;
   font-size: 14px;
   line-height: 1.7;
   margin: 0;
 }
 .eyebrow {
   font-size: 12px !important;
-  letter-spacing: 0.01em;
-  color: #2457a7 !important;
-  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #1d4ed8 !important;
+  font-weight: 700;
 }
 .childPicker {
   display: flex;
   gap: 12px;
   align-items: center;
   margin: 0 0 24px;
-  padding: 12px 16px;
-  border: 1px solid #e4e9f0;
-  border-radius: 12px;
+  padding: 14px 18px;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
   background: white;
+  box-shadow: 0 2px 8px -2px rgba(15, 23, 42, 0.04);
 }
 .childPicker label {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
 }
 .childPicker select {
-  border: 1px solid #7a8699;
+  border: 1px solid #94a3b8;
   min-height: 40px;
-  border-radius: 8px;
+  border-radius: 10px;
   background: white;
   padding: 8px;
   font: inherit;
@@ -176,42 +177,44 @@
 }
 .childPicker span {
   font-size: 12px;
-  color: #667085;
+  color: #475569;
   margin-left: auto;
 }
 .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1px solid #e4e9f0;
+  border: 1px solid #e2e8f0;
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
   margin-bottom: 24px;
   font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 8px -2px rgba(15, 23, 42, 0.04);
 }
 .stat {
   padding: 20px 24px;
-  border-right: 1px solid #e4e9f0;
+  border-right: 1px solid #e2e8f0;
 }
 .stat:last-child {
   border: 0;
 }
 .stat span {
   display: block;
-  color: #667085;
+  color: #475569;
   font-size: 13px;
+  font-weight: 600;
 }
 .stat strong {
   display: block;
-  color: #172b4d;
+  color: #0f172a;
   font-size: 24px;
   margin-top: 8px;
-  font-weight: 600;
+  font-weight: 800;
 }
 .stat small {
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 500;
   margin-left: 4px;
-  color: #667085;
+  color: #475569;
 }
 .twoCol {
   display: grid;
@@ -221,31 +224,32 @@
 }
 .panel {
   background: white;
-  border: 1px solid #e4e9f0;
-  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
   padding: 24px;
   min-width: 0;
   margin-bottom: 20px;
+  box-shadow: 0 2px 8px -2px rgba(15, 23, 42, 0.04);
 }
 .panel h2 {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.4;
-  color: #172b4d;
+  color: #0f172a;
   margin: 0 0 16px;
   letter-spacing: -0.02em;
 }
 .panel h3 {
   font-size: 16px;
-  font-weight: 600;
-  color: #172b4d;
+  font-weight: 700;
+  color: #0f172a;
   margin: 12px 0 8px;
   line-height: 1.5;
 }
 .panel p {
   font-size: 14px;
   line-height: 1.75;
-  color: #667085;
+  color: #475569;
   margin: 8px 0 16px;
 }
 .twoCol .panel {
@@ -261,21 +265,24 @@
 .chip {
   display: inline-flex;
   align-items: center;
-  padding: 4px 8px;
-  background: #edf3fb;
-  border-radius: 6px;
-  color: #2457a7;
+  padding: 4px 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 9999px;
+  color: #1d4ed8;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.5;
 }
 .green {
-  color: #217a60;
-  background: #e9f5ef;
+  color: #047857;
+  background: #ecfdf5;
+  border-color: #a7f3d0;
 }
 .amber {
-  color: #80511b;
-  background: #fff4e2;
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fde68a;
 }
 .schedule {
   display: flex;
@@ -284,21 +291,22 @@
   margin: 20px 0;
 }
 .date {
-  border: 1px solid #e4e9f0;
-  border-radius: 8px;
-  min-width: 52px;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  border-radius: 12px;
+  min-width: 54px;
   text-align: center;
   padding: 8px;
   font-size: 12px;
   line-height: 1.6;
-  color: #667085;
+  color: #1e3a8a;
   font-variant-numeric: tabular-nums;
 }
 .date strong {
   display: block;
   font-size: 20px;
-  font-weight: 600;
-  color: #172b4d;
+  font-weight: 800;
+  color: #0f172a;
 }
 .schedule p {
   font-size: 13px;
@@ -310,13 +318,13 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid #2457a7;
-  background: #2457a7;
+  border: 1px solid #1e3a8a;
+  background: #1e3a8a;
   color: white;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 13px;
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 8px 18px;
+  border-radius: 9999px;
   text-decoration: none;
   cursor: pointer;
   line-height: 1.5;
@@ -325,15 +333,16 @@
     border-color 150ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .action:hover {
-  background: #1c4689;
+  background: #2563eb;
+  border-color: #2563eb;
 }
 .secondary {
   background: white;
-  color: #2457a7;
-  border-color: #bccce3;
+  color: #1e3a8a;
+  border-color: #93c5fd;
 }
 .secondary:hover {
-  background: #edf3fb;
+  background: #eff6ff;
 }
 .full {
   width: 100%;
