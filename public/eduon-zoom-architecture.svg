@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" fill="none">
+  <rect width="1200" height="720" fill="#F8FAFC" />
+  <rect x="24" y="24" width="1152" height="672" rx="24" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2" />
+
+  <!-- Header -->
+  <rect x="24" y="24" width="1152" height="84" rx="24" fill="#0F172A" />
+  <text x="64" y="64" fill="#FFFFFF" font-family="'Segoe UI', Arial, sans-serif" font-size="24" font-weight="800">
+    EDUON Platform — Zoom Integration Technical Architecture
+  </text>
+  <text x="64" y="90" fill="#93C5FD" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="600">
+    HTTPS / TLS 1.3 · OAuth 2.0 (Authorization Code) · Zoom Meeting SDK (Web Component View v6.10.0) · HMAC-SHA256 Webhooks
+  </text>
+
+  <!-- Box 1: Clients (Instructors & Students) -->
+  <rect x="64" y="148" width="280" height="500" rx="16" fill="#EFF6FF" stroke="#93C5FD" stroke-width="2" />
+  <text x="88" y="186" fill="#1E3A8A" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="800">
+    1. Web Client (Browser)
+  </text>
+  <text x="88" y="210" fill="#475569" font-family="'Segoe UI', Arial, sans-serif" font-size="13">
+    https://www.eduonlink.com
+  </text>
+
+  <rect x="88" y="236" width="232" height="110" rx="12" fill="#FFFFFF" stroke="#BFDBFE" stroke-width="1.5" />
+  <text x="104" y="264" fill="#0F172A" font-family="'Segoe UI', Arial, sans-serif" font-size="15" font-weight="700">
+    Instructor Console
+  </text>
+  <text x="104" y="288" fill="#475569" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • Initiates Zoom OAuth 2.0 link
+  </text>
+  <text x="104" y="308" fill="#475569" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • Schedules class Zoom meetings
+  </text>
+  <text x="104" y="328" fill="#475569" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • Hosts via Embedded SDK (role=1)
+  </text>
+
+  <rect x="88" y="366" width="232" height="110" rx="12" fill="#FFFFFF" stroke="#BFDBFE" stroke-width="1.5" />
+  <text x="104" y="394" fill="#0F172A" font-family="'Segoe UI', Arial, sans-serif" font-size="15" font-weight="700">
+    Student Classroom
+  </text>
+  <text x="104" y="418" fill="#475569" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • Verified enrollment check
+  </text>
+  <text x="104" y="438" fill="#475569" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • Joins via Embedded SDK (role=0)
+  </text>
+  <text x="104" y="458" fill="#475569" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • Mounts #zoom-sdk-component-root
+  </text>
+
+  <rect x="88" y="496" width="232" height="124" rx="12" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="1.5" />
+  <text x="104" y="524" fill="#065F46" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">
+    Zoom Meeting SDK v6.10.0
+  </text>
+  <text x="104" y="548" fill="#047857" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • Component View (Embedded)
+  </text>
+  <text x="104" y="568" fill="#047857" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • Short-lived HS256 SDK JWT
+  </text>
+  <text x="104" y="588" fill="#047857" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • No client secret exposed in browser
+  </text>
+
+  <!-- Box 2: EDUON Backend (Next.js Server on Vercel + Supabase) -->
+  <rect x="444" y="148" width="320" height="500" rx="16" fill="#F8FAFC" stroke="#64748B" stroke-width="2" />
+  <text x="468" y="186" fill="#0F172A" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="800">
+    2. EDUON Backend (Next.js API)
+  </text>
+  <text x="468" y="210" fill="#475569" font-family="'Segoe UI', Arial, sans-serif" font-size="13">
+    Vercel Serverless + Supabase Auth/DB
+  </text>
+
+  <rect x="468" y="236" width="272" height="110" rx="12" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5" />
+  <text x="484" y="264" fill="#1E3A8A" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">
+    OAuth &amp; Token Service
+  </text>
+  <text x="484" y="286" fill="#334155" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • /api/zoom/oauth/start (CSRF state)
+  </text>
+  <text x="484" y="306" fill="#334155" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • /api/zoom/oauth/callback
+  </text>
+  <text x="484" y="326" fill="#334155" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • Auto token refresh before expiry
+  </text>
+
+  <rect x="468" y="366" width="272" height="110" rx="12" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5" />
+  <text x="484" y="394" fill="#1E3A8A" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">
+    Meeting &amp; SDK Signature API
+  </text>
+  <text x="484" y="416" fill="#334155" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • /api/zoom/sessions/[id]/meeting
+  </text>
+  <text x="484" y="436" fill="#334155" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • /api/zoom/sessions/[id]/join
+  </text>
+  <text x="484" y="456" fill="#334155" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • Signs SDK JWT server-side (HS256)
+  </text>
+
+  <rect x="468" y="496" width="272" height="124" rx="12" fill="#FFFBEB" stroke="#FCD34D" stroke-width="1.5" />
+  <text x="484" y="524" fill="#92400E" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">
+    Supabase PostgreSQL (Encrypted)
+  </text>
+  <text x="484" y="548" fill="#78350F" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • AES-256-GCM encrypted OAuth tokens
+  </text>
+  <text x="484" y="568" fill="#78350F" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • RBAC (Admin / Instructor / Student)
+  </text>
+  <text x="484" y="588" fill="#78350F" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • Attendance &amp; Webhook audit logs
+  </text>
+
+  <!-- Box 3: Zoom Cloud Platform -->
+  <rect x="856" y="148" width="280" height="500" rx="16" fill="#EFF6FF" stroke="#2563EB" stroke-width="2" />
+  <text x="880" y="186" fill="#1E3A8A" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="800">
+    3. Zoom Cloud Platform
+  </text>
+  <text x="880" y="210" fill="#475569" font-family="'Segoe UI', Arial, sans-serif" font-size="13">
+    zoom.us / api.zoom.us
+  </text>
+
+  <rect x="880" y="236" width="232" height="110" rx="12" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5" />
+  <text x="896" y="264" fill="#1E3A8A" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">
+    Zoom OAuth 2.0 Server
+  </text>
+  <text x="896" y="288" fill="#334155" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • User consent &amp; authorization code
+  </text>
+  <text x="896" y="308" fill="#334155" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • Issues access &amp; refresh tokens
+  </text>
+
+  <rect x="880" y="366" width="232" height="110" rx="12" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5" />
+  <text x="896" y="394" fill="#1E3A8A" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">
+    Zoom REST API v2
+  </text>
+  <text x="896" y="418" fill="#334155" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • GET /v2/users/me
+  </text>
+  <text x="896" y="438" fill="#334155" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • POST /v2/users/me/meetings
+  </text>
+  <text x="896" y="458" fill="#334155" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • GET /v2/meetings/{id}/recordings
+  </text>
+
+  <rect x="880" y="496" width="232" height="124" rx="12" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5" />
+  <text x="896" y="524" fill="#1E3A8A" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700">
+    Zoom Webhooks
+  </text>
+  <text x="896" y="548" fill="#334155" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • POST /api/zoom/webhook
+  </text>
+  <text x="896" y="568" fill="#334155" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • x-zm-signature (HMAC-SHA256)
+  </text>
+  <text x="896" y="588" fill="#334155" font-family="'Segoe UI', Arial, sans-serif" font-size="12">
+    • meeting.started / ended / joined
+  </text>
+
+  <!-- Arrows -->
+  <g stroke="#2563EB" stroke-width="3" fill="none">
+    <line x1="344" y1="290" x2="444" y2="290" />
+    <line x1="344" y1="420" x2="444" y2="420" />
+    <line x1="764" y1="290" x2="856" y2="290" />
+    <line x1="764" y1="420" x2="856" y2="420" />
+    <line x1="856" y1="556" x2="764" y2="556" />
+  </g>
+  <text x="364" y="280" fill="#1E3A8A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">HTTPS / Session</text>
+  <text x="360" y="410" fill="#1E3A8A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">SDK JWT Request</text>
+  <text x="776" y="280" fill="#1E3A8A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">OAuth 2.0 TLS</text>
+  <text x="776" y="410" fill="#1E3A8A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">REST API v2</text>
+  <text x="772" y="546" fill="#1E3A8A" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700">Signed Webhook</text>
+</svg>
