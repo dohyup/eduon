@@ -4,21 +4,23 @@ import {
   ArrowUpRight,
   Check,
   BookOpen,
-  Search,
   Video,
   ShieldCheck,
   Sparkles,
   MessageCircle,
-  SlidersHorizontal,
   CheckCircle2,
   Users,
 } from "lucide-react";
 import { OfferingCard } from "@/components/catalog/offering-card";
+import { SmartSearchTabs } from "@/components/catalog/smart-search-tabs";
 import { listPublicOfferings } from "@/modules/catalog/public";
 import { isDemoMode } from "@/server/config";
 
 export default async function Home() {
-  const { items: demoOfferings } = await listPublicOfferings();
+  const { items: demoOfferings } = await listPublicOfferings(
+    {},
+    { fetchAll: true },
+  );
   const demo = isDemoMode();
 
   return (
@@ -179,78 +181,8 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Stitch 3-Step Smart Custom Filter Widget */}
-      <section className="smart-filter-section container" aria-label="3초 맞춤 스마트 필터">
-        <div className="smart-filter-card">
-          <div className="smart-filter-head">
-            <div>
-              <span className="smart-filter-badge">
-                <SlidersHorizontal size={13} />
-                3초 맞춤 스마트 필터
-              </span>
-              <h2>헤매지 않고 우리 아이에게 딱 맞는 학원 수업 바로 찾기</h2>
-              <p className="muted">
-                과목·학년·수준을 선택하면 조건에 맞는 검증된 실시간 학원 수업을
-                즉시 비교할 수 있습니다.
-              </p>
-            </div>
-            <div className="smart-quick-tags" aria-label="빠른 조건 탐색">
-              <Link href="/classes?subject=math" className="smart-chip active">
-                #초·중등 수학 개념완성
-              </Link>
-              <Link href="/classes?subject=english" className="smart-chip">
-                #원서 리딩·영어 발화
-              </Link>
-              <Link href="/classes?level=beginner" className="smart-chip">
-                #기초 탄탄 소그룹
-              </Link>
-            </div>
-          </div>
-          <form action="/classes" className="smart-filter-form">
-            <div className="smart-step-box">
-              <label htmlFor="home-subject">
-                <span className="step-num">1</span> 과목 선택
-              </label>
-              <select id="home-subject" name="subject" defaultValue="">
-                <option value="">전체 과목 (수학 · 영어)</option>
-                <option value="math">수학 (개념·응용·심화)</option>
-                <option value="english">영어 (리딩·문법·스피킹)</option>
-              </select>
-            </div>
-            <div className="smart-step-box">
-              <label htmlFor="home-grade">
-                <span className="step-num">2</span> 수강 대상 (학년)
-              </label>
-              <select id="home-grade" name="grade" defaultValue="">
-                <option value="">전체 학년 (초등~고등)</option>
-                <option value="4">초등 4학년</option>
-                <option value="5">초등 5학년</option>
-                <option value="6">초등 6학년</option>
-                <option value="7">중등 1학년</option>
-                <option value="8">중등 2학년</option>
-                <option value="9">중등 3학년</option>
-              </select>
-            </div>
-            <div className="smart-step-box">
-              <label htmlFor="home-level">
-                <span className="step-num">3</span> 학습 집중 수준
-              </label>
-              <select id="home-level" name="level" defaultValue="">
-                <option value="">전체 수준</option>
-                <option value="beginner">기초 다지기</option>
-                <option value="intermediate">기본 · 응용 확장</option>
-                <option value="advanced">심화 · 서술형 완성</option>
-              </select>
-            </div>
-            <div className="smart-filter-submit">
-              <button type="submit" className="button smart-submit-btn">
-                <Search size={17} />
-                맞춤 수업 찾기
-              </button>
-            </div>
-          </form>
-        </div>
-      </section>
+      {/* Stitch 2-Mode Custom Search Tabs: 1. Natural Language Search / 2. Smart Filter */}
+      <SmartSearchTabs offerings={demoOfferings} />
 
       {/* Stitch 1:1 Counseling Banner */}
       <section className="container counseling-section" aria-label="1:1 맞춤 학습 상담 안내">

@@ -5,25 +5,70 @@ import { hydrateRuntimeFromSupabaseKv } from "@/integrations/auth/provider";
 import { academies, demoOfferings } from "@/demo/catalog";
 import { searchDemoOfferings } from "@/demo/search";
 import { searchOfferings } from "./search";
+import { filterOfferingsByNaturalLanguage } from "./natural-search";
 import type { PublicOffering, SearchInput } from "@/contracts/domain";
-export async function listPublicOfferings(input: SearchInput = {}) {
-  if (isDemoMode())
-    return { ...searchDemoOfferings(input), unavailable: false };
+
+export async function listPublicOfferings(
+  input: SearchInput = {},
+  options?: { query?: string; fetchAll?: boolean },
+) {
+  const query = options?.query?.trim() || "";
+  const shouldFetchAll = Boolean(options?.fetchAll || query);
+
+  if (isDemoMode()) {
+    const base = searchDemoOfferings(input);
+    const items = query
+      ? filterOfferingsByNaturalLanguage(base.items, query)
+      : base.items;
+    return {
+      items,
+      nextCursor: query ? null : base.nextCursor,
+      unavailable: false,
+    };
+  }
   try {
     await hydrateRuntimeFromSupabaseKv();
     const db = getDatabase();
-    const result = await searchOfferings(input, db);
+    let collected: PublicOffering[] = [];
+    let nextCursor: string | null = input.cursor || null;
+
+    if (shouldFetchAll) {
+      let cursor: string | undefined = input.cursor;
+      for (let page = 0; page < 5; page++) {
+        const pageRes = await searchOfferings({ ...input, cursor }, db);
+        collected.push(...pageRes.items);
+        if (!pageRes.nextCursor) {
+          nextCursor = null;
+          break;
+        }
+        cursor = pageRes.nextCursor;
+        nextCursor = pageRes.nextCursor;
+      }
+    } else {
+      const result = await searchOfferings(input, db);
+      collected = result.items;
+      nextCursor = result.nextCursor;
+    }
+
     const rows = await db.academy.findMany({
-      where: { id: { in: result.items.map((o) => o.academyId) } },
+      where: { id: { in: collected.map((o) => o.academyId) } },
       select: { id: true, name: true, region: true },
     });
+    const academyMap = new Map(rows.map((a) => [a.id, a]));
+    let hydrated: PublicOffering[] = collected.map((o) => ({
+      ...o,
+      academyName: academyMap.get(o.academyId)?.name,
+      academyRegion: academyMap.get(o.academyId)?.region,
+    }));
+
+    if (query) {
+      hydrated = filterOfferingsByNaturalLanguage(hydrated, query);
+      nextCursor = null;
+    }
+
     return {
-      ...result,
-      items: result.items.map((o) => ({
-        ...o,
-        academyName: rows.find((a) => a.id === o.academyId)?.name,
-        academyRegion: rows.find((a) => a.id === o.academyId)?.region,
-      })),
+      items: hydrated,
+      nextCursor,
       unavailable: false,
     };
   } catch {

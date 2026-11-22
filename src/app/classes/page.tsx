@@ -34,10 +34,13 @@ export default async function Classes({
   };
   const { items, unavailable, nextCursor } = invalid
     ? { items: [], unavailable: false, nextCursor: null }
-    : await listPublicOfferings({
-        ...input,
-        cursor: values.cursor || undefined,
-      });
+    : await listPublicOfferings(
+        {
+          ...input,
+          cursor: values.cursor || undefined,
+        },
+        { query: values.q },
+      );
   return (
     <main id="main-content" className="container page-content">
       <div className="page-heading">
