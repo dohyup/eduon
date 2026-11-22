@@ -21,12 +21,38 @@ export function OfferingCard({ offering: o }: { offering: PublicOffering }) {
       academies.find((ac) => ac.id === o.academyId)?.area ||
       "온라인 라이브",
   };
+  const isKorean = o.title.includes("[국어]");
+  const isArt = o.title.includes("[미술]");
+  const subjectTitle = isKorean
+    ? "초·중·고 국어"
+    : isArt
+      ? "초·중·고 미술"
+      : o.subject === "math"
+        ? "초·중·고 수학"
+        : "초·중·고 영어";
+  const subjectShort = isKorean
+    ? "국어"
+    : isArt
+      ? "미술"
+      : o.subject === "math"
+        ? "수학"
+        : "영어";
+  const symbolText = isKorean
+    ? "문해 · 논술"
+    : isArt
+      ? "Art & Design"
+      : o.subject === "math"
+        ? "f(x) = x² + y²"
+        : "Reading & Flow";
   const rating = o.subject === "math" ? "4.9" : "4.8";
   const reviewCount = o.subject === "math" ? "142" : "98";
-  const reviewKeywords =
-    o.subject === "math"
-      ? ["질문 피드백 10분 내 답변", "개념·심화 밀착 지도"]
-      : ["발화 중심 양방향 첨삭", "수준별 리딩 코칭"];
+  const reviewKeywords = isKorean
+    ? ["비문학·문학 핵심 분석", "서술형·독서논술 첨삭"]
+    : isArt
+      ? ["1:1 실기 크리틱 지도", "창의 포트폴리오 완성"]
+      : o.subject === "math"
+        ? ["질문 피드백 10분 내 답변", "개념·심화 밀착 지도"]
+        : ["발화 중심 양방향 첨삭", "수준별 리딩 코칭"];
 
   return (
     <article className="course-card">
@@ -44,12 +70,9 @@ export function OfferingCard({ offering: o }: { offering: PublicOffering }) {
         </div>
         <div className="art-center">
           <span className="art-subject">
-            {o.subject === "math" ? "초·중등 수학" : "초·중등 영어"} ·{" "}
-            {gradeLabel(o.gradeMin)}–{gradeLabel(o.gradeMax)}
+            {subjectTitle} · {gradeLabel(o.gradeMin)}–{gradeLabel(o.gradeMax)}
           </span>
-          <span className="art-symbol">
-            {o.subject === "math" ? "f(x) = x² + y²" : "Reading & Flow"}
-          </span>
+          <span className="art-symbol">{symbolText}</span>
         </div>
         <div className="art-bottom-bar">
           <span>{schedule(o)}</span>
@@ -73,7 +96,7 @@ export function OfferingCard({ offering: o }: { offering: PublicOffering }) {
         </h3>
         <div className="course-rating-row">
           <span className="badge-subject">
-            {o.subject === "math" ? "수학" : "영어"} · {levelLabel[o.level]}
+            {subjectShort} · {levelLabel[o.level]}
           </span>
           <span className="rating-pill" aria-label={`평점 ${rating}점`}>
             <Star size={13} fill="currentColor" />

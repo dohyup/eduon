@@ -313,7 +313,7 @@ export default async function Home() {
           </Link>
         </div>
         <div className="course-grid">
-          {demoOfferings.slice(0, 3).map((o) => (
+          {demoOfferings.slice(0, 6).map((o) => (
             <OfferingCard key={o.id} offering={o} />
           ))}
         </div>

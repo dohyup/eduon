@@ -17,12 +17,13 @@ export function GET(request: Request) {
         ctx.db.studentProfile.findUnique({ where: { accountUserId: user.id } }),
         ctx.db.zoomAccount.findUnique({ where: { userId: user.id } }),
       ]);
+      const ownedAcademyIds = memberships
+        .filter((m) => m.role === "owner")
+        .map((m) => m.academyId);
       const instructors = await ctx.db.academyMembership.findMany({
         where: {
           academyId: {
-            in: memberships
-              .filter((m) => m.role === "owner")
-              .map((m) => m.academyId),
+            in: ownedAcademyIds,
           },
           active: true,
           user: { disabledAt: null },
@@ -33,6 +34,39 @@ export function GET(request: Request) {
           role: true,
           user: { select: { email: true } },
         },
+      });
+      const canViewStudents = user.platformAdmin || ownedAcademyIds.length > 0;
+      const allStudents = canViewStudents
+        ? await ctx.db.studentProfile.findMany({
+            include: {
+              account: { select: { email: true } },
+              enrollments: {
+                include: {
+                  offering: {
+                    include: {
+                      course: { select: { title: true } },
+                      academy: { select: { id: true, name: true, region: true } },
+                    },
+                  },
+                },
+              },
+            },
+            orderBy: { createdAt: "desc" },
+            take: 100,
+          })
+        : [];
+      const registeredStudents = allStudents.map((sp) => {
+        const firstEnrollment = sp.enrollments?.[0];
+        return {
+          id: sp.id,
+          name: sp.name,
+          grade: sp.grade,
+          email: sp.account?.email ?? null,
+          academyName: firstEnrollment?.offering?.academy?.name ?? null,
+          academyRegion: firstEnrollment?.offering?.academy?.region ?? null,
+          courseTitle: firstEnrollment?.offering?.course?.title ?? null,
+          enrollmentStatus: firstEnrollment?.status ?? "active",
+        };
       });
       return {
         instructors: instructors.map((m) => ({
@@ -50,6 +84,7 @@ export function GET(request: Request) {
         memberships,
         children: links.map((l) => l.student),
         student,
+        registeredStudents,
         zoomAccount: formatSanitizedZoomAccount(zoomRow, ctx.now()),
       };
     }),

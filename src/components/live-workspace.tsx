@@ -54,6 +54,16 @@ type Me = {
   }[];
   children: Child[];
   student: { id: string; name: string; grade: number } | null;
+  registeredStudents?: Array<{
+    id: string;
+    name: string;
+    grade: number;
+    email: string | null;
+    academyName: string | null;
+    academyRegion: string | null;
+    courseTitle: string | null;
+    enrollmentStatus: string;
+  }>;
   zoomAccount?: ZoomAccountState;
 };
 type ZoomMeetingInfo = {
@@ -1191,16 +1201,52 @@ export function LiveWorkspace({
                 )}
               {role === "owner" && (
                 <>
-                  {section === "finance" || section === "students" ? (
-                    <Panel
-                      title={
-                        section === "finance" ? "정산 내역" : "수강생 관리"
-                      }
-                    >
+                  {section === "finance" ? (
+                    <Panel title="정산 내역">
                       <p>
                         결제·수강권 기능 연결 전입니다. 아직 실제
                         거래·정산·수강생 명단을 제공하지 않습니다.
                       </p>
+                    </Panel>
+                  ) : section === "students" ? (
+                    <Panel
+                      title={`수강생 관리 (${me.registeredStudents?.length ?? 0}명)`}
+                    >
+                      {me.registeredStudents &&
+                      me.registeredStudents.length > 0 ? (
+                        <ul className={styles.list}>
+                          {me.registeredStudents.map((stu) => (
+                            <li key={stu.id}>
+                              <div className={styles.row}>
+                                <div>
+                                  <h3>
+                                    {stu.name} ({gradeText(stu.grade)})
+                                  </h3>
+                                  <p>
+                                    {stu.email ?? "이메일 미연결"}
+                                    {stu.academyName
+                                      ? ` · ${stu.academyName} (${stu.academyRegion ?? ""})`
+                                      : ""}
+                                    {stu.courseTitle
+                                      ? ` · 수강 강좌: ${stu.courseTitle}`
+                                      : ""}
+                                  </p>
+                                </div>
+                                <span className={styles.badge}>
+                                  {stu.enrollmentStatus === "active"
+                                    ? "수강 중"
+                                    : stu.enrollmentStatus}
+                                </span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p>
+                          결제·수강권 기능 연결 전입니다. 아직 실제
+                          거래·정산·수강생 명단을 제공하지 않습니다.
+                        </p>
+                      )}
                     </Panel>
                   ) : (
                     <>
@@ -2220,6 +2266,40 @@ export function LiveWorkspace({
                             </button>
                           )}
                         </Panel>
+                        {me.registeredStudents &&
+                          me.registeredStudents.length > 0 && (
+                            <Panel
+                              title={`가입 학생 및 수강 현황 (${me.registeredStudents.length}명)`}
+                            >
+                              <ul className={styles.list}>
+                                {me.registeredStudents.map((stu) => (
+                                  <li key={stu.id}>
+                                    <div className={styles.row}>
+                                      <div>
+                                        <h3>
+                                          {stu.name} ({gradeText(stu.grade)})
+                                        </h3>
+                                        <p>
+                                          {stu.email ?? "이메일 미연결"}
+                                          {stu.academyName
+                                            ? ` · ${stu.academyName} (${stu.academyRegion ?? ""})`
+                                            : ""}
+                                          {stu.courseTitle
+                                            ? ` · ${stu.courseTitle}`
+                                            : ""}
+                                        </p>
+                                      </div>
+                                      <span className={styles.badge}>
+                                        {stu.enrollmentStatus === "active"
+                                          ? "수강 중"
+                                          : stu.enrollmentStatus}
+                                      </span>
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            </Panel>
+                          )}
                         <Panel title="보호자 확인 기록">
                           <p>
                             증빙과 관계 확인을 실제로 마친 경우에만 확인 사유를

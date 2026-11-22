@@ -1,6 +1,7 @@
 import "server-only";
 import { isDemoMode } from "@/server/config";
 import { getDatabase } from "@/server/db";
+import { hydrateRuntimeFromSupabaseKv } from "@/integrations/auth/provider";
 import { academies, demoOfferings } from "@/demo/catalog";
 import { searchDemoOfferings } from "@/demo/search";
 import { searchOfferings } from "./search";
@@ -9,6 +10,7 @@ export async function listPublicOfferings(input: SearchInput = {}) {
   if (isDemoMode())
     return { ...searchDemoOfferings(input), unavailable: false };
   try {
+    await hydrateRuntimeFromSupabaseKv();
     const db = getDatabase();
     const result = await searchOfferings(input, db);
     const rows = await db.academy.findMany({
@@ -34,6 +36,7 @@ export async function getPublicOffering(
   if (isDemoMode()) return demoOfferings.find((o) => o.id === id) || null;
   if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id))
     return null;
+  await hydrateRuntimeFromSupabaseKv();
   const db = getDatabase();
   const row = await db.offering.findFirst({
     where: { id, status: "published", academy: { status: "approved" } },
@@ -75,6 +78,7 @@ export async function getPublicAcademy(id: string) {
   if (isDemoMode()) return academies.find((a) => a.id === id) || null;
   if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id))
     return null;
+  await hydrateRuntimeFromSupabaseKv();
   const row = await getDatabase().academy.findFirst({
     where: { id, status: "approved" },
     select: { id: true, name: true, region: true },

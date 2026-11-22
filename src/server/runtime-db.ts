@@ -1538,6 +1538,10 @@ export function hydrateRuntimeDbFromMetadata(
   if (!meta || typeof meta !== "object") return;
   const snap = meta.eduon_runtime_snapshot as
     | {
+        academies?: Row[];
+        academyMemberships?: Row[];
+        users?: Row[];
+        studentProfiles?: Row[];
         zoomAccounts?: Row[];
         courses?: Row[];
         offerings?: Row[];
@@ -1564,6 +1568,10 @@ export function hydrateRuntimeDbFromMetadata(
     }
   };
 
+  upsertById(store.academy, snap.academies);
+  upsertById(store.academyMembership, snap.academyMemberships);
+  upsertById(store.user, snap.users);
+  upsertById(store.studentProfile, snap.studentProfiles);
   upsertById(store.course, snap.courses);
   upsertById(store.offering, snap.offerings);
   upsertById(store.session, snap.sessions);
