@@ -458,7 +458,49 @@ export function LiveWorkspace({
   const load = useCallback(
     async (signal?: AbortSignal) => {
       try {
-        const current = await api<Me>("/api/me", undefined, signal);
+        const [
+          current,
+          acadResult,
+          offResult,
+          studentResult,
+          zmResult,
+          opResult,
+          stResult,
+        ] = await Promise.all([
+          api<Me>("/api/me", undefined, signal),
+          role === "owner" || role === "admin"
+            ? api<Academy[]>(
+                role === "admin"
+                  ? "/api/academies?review=true"
+                  : "/api/academies",
+                undefined,
+                signal,
+              )
+            : Promise.resolve(null),
+          role === "owner" || role === "instructor"
+            ? api<Offering[]>("/api/offerings", undefined, signal)
+            : Promise.resolve(null),
+          role === "student"
+            ? api<StudentOverview>("/api/zoom/student", undefined, signal)
+            : Promise.resolve(null),
+          role === "admin"
+            ? api<AdminZoomDashboard>("/api/zoom/admin", undefined, signal)
+            : Promise.resolve(null),
+          role === "admin"
+            ? api<{
+                admins: Array<{
+                  id: string;
+                  email: string;
+                  createdAt: string;
+                  fromEnvConfig: boolean;
+                }>;
+                configuredEmails: string[];
+              }>("/api/admin/operators", undefined, signal)
+            : Promise.resolve(null),
+          role === "admin"
+            ? api<AdminSettingsView>("/api/admin/settings", undefined, signal)
+            : Promise.resolve(null),
+        ]);
         if (!current.ok) {
           setMe(null);
           setLoadError(errorMessage(current.code));
@@ -466,53 +508,25 @@ export function LiveWorkspace({
         }
         setLoadError("");
         setMe(current.value);
-        if (role === "owner" || role === "admin") {
-          const result = await api<Academy[]>(
-            role === "admin" ? "/api/academies?review=true" : "/api/academies",
-            undefined,
-            signal,
-          );
-          if (result.ok) {
-            setAcademies(result.value);
-            setAcademyCursor(result.nextCursor ?? null);
-          } else setLoadError(errorMessage(result.code));
+        if (acadResult) {
+          if (acadResult.ok) {
+            setAcademies(acadResult.value);
+            setAcademyCursor(acadResult.nextCursor ?? null);
+          } else setLoadError(errorMessage(acadResult.code));
         }
-        if (role === "owner" || role === "instructor") {
-          const result = await api<Offering[]>(
-            "/api/offerings",
-            undefined,
-            signal,
-          );
-          if (result.ok) {
-            setOfferings(result.value);
-            setOfferingCursor(result.nextCursor ?? null);
-          } else setLoadError(errorMessage(result.code));
+        if (offResult) {
+          if (offResult.ok) {
+            setOfferings(offResult.value);
+            setOfferingCursor(offResult.nextCursor ?? null);
+          } else setLoadError(errorMessage(offResult.code));
         }
-        if (role === "student" && current.value.student) {
-          const stResult = await api<StudentOverview>(
-            "/api/zoom/student",
-            undefined,
-            signal,
-          );
-          if (stResult.ok) setStudentOverview(stResult.value);
+        if (studentResult && current.value.student && studentResult.ok) {
+          setStudentOverview(studentResult.value);
         }
         if (role === "admin" && current.value.user.platformAdmin) {
-          const [zmResult, opResult, stResult] = await Promise.all([
-            api<AdminZoomDashboard>("/api/zoom/admin", undefined, signal),
-            api<{
-              admins: Array<{
-                id: string;
-                email: string;
-                createdAt: string;
-                fromEnvConfig: boolean;
-              }>;
-              configuredEmails: string[];
-            }>("/api/admin/operators", undefined, signal),
-            api<AdminSettingsView>("/api/admin/settings", undefined, signal),
-          ]);
-          if (zmResult.ok) setAdminZoom(zmResult.value);
-          if (opResult.ok) setAdminOperators(opResult.value);
-          if (stResult.ok) setAdminSettings(stResult.value);
+          if (zmResult?.ok) setAdminZoom(zmResult.value);
+          if (opResult?.ok) setAdminOperators(opResult.value);
+          if (stResult?.ok) setAdminSettings(stResult.value);
         }
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError"))

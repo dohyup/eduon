@@ -560,7 +560,27 @@ function getStore(): RuntimeStoreData {
   return globalRuntimeDb.__eduonRuntimeStore;
 }
 
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
 function persistStore(): void {
+  if (process.env.NODE_ENV === "production") {
+    if (persistTimer) return;
+    persistTimer = setTimeout(() => {
+      persistTimer = null;
+      const store = globalRuntimeDb.__eduonRuntimeStore;
+      if (!store) return;
+      void fs.promises
+        .writeFile(
+          storeFilePath(),
+          JSON.stringify(store, (_k, v) =>
+            typeof v === "bigint" ? v.toString() : v,
+          ),
+          "utf8",
+        )
+        .catch(() => {});
+    }, 250);
+    return;
+  }
   try {
     const store = globalRuntimeDb.__eduonRuntimeStore;
     if (!store) return;
@@ -1343,9 +1363,15 @@ function createModelDelegate(model: ModelName) {
   };
 }
 
+const provisionedUserVersion = new Map<string, string>();
+
 export function ensureRuntimeUserProvisioned(userId: string, email: string): void {
   const store = getStore();
   const normalized = email.trim().toLowerCase();
+  const stateSig = `${store.academy.length}:${store.offering.length}:${store.zoomAccount.length}`;
+  if (provisionedUserVersion.get(userId) === stateSig) {
+    return;
+  }
   let user = store.user.find((u) => u.id === userId);
   if (!user) {
     user = applyDefaults("user", {
@@ -1490,7 +1516,7 @@ export function ensureRuntimeUserProvisioned(userId: string, email: string): voi
   }
 
   const studentId = String(student.id);
-  for (const off of store.offering) {
+  for (const off of store.offering.slice(0, 4)) {
     const offId = String(off.id);
     if (
       !store.enrollment.some(
@@ -1508,6 +1534,10 @@ export function ensureRuntimeUserProvisioned(userId: string, email: string): voi
     }
   }
 
+  provisionedUserVersion.set(
+    userId,
+    `${store.academy.length}:${store.offering.length}:${store.zoomAccount.length}`,
+  );
   persistStore();
 }
 
@@ -1555,12 +1585,19 @@ export function hydrateRuntimeDbFromMetadata(
 
   const store = getStore();
   const upsertById = (table: Row[], incoming: Row[] | undefined) => {
-    if (!Array.isArray(incoming)) return;
+    if (!Array.isArray(incoming) || incoming.length === 0) return;
+    const indexById = new Map<string, number>();
+    for (let i = 0; i < table.length; i++) {
+      const id = table[i]?.id;
+      if (typeof id === "string") indexById.set(id, i);
+    }
     for (const raw of incoming) {
-      if (!raw || typeof raw !== "object" || !raw.id) continue;
+      if (!raw || typeof raw !== "object" || typeof raw.id !== "string")
+        continue;
       const revived = reviveRow(raw);
-      const idx = table.findIndex((r) => r.id === revived.id);
-      if (idx === -1) {
+      const idx = indexById.get(raw.id);
+      if (idx === undefined) {
+        indexById.set(raw.id, table.length);
         table.push(revived);
       } else {
         table[idx] = { ...table[idx], ...revived };

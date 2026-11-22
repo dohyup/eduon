@@ -29,8 +29,20 @@ const ADMIN_FALLBACK_SECRET =
   process.env.ZOOM_TOKEN_ENCRYPTION_KEY ||
   "eduon-admin-fallback-session-secret-key-2026";
 const MAX_SUPABASE_COOKIE_BYTES = 3500;
+const KV_HYDRATE_TTL_MS = 60_000;
+const AUTH_CACHE_TTL_MS = 30_000;
 
 let lastKvHydratedAt = 0;
+let inflightHydrationPromise: Promise<void> | null = null;
+
+const authIdentityCache = new Map<
+  string,
+  { userId: string; expiresAt: number }
+>();
+const inflightAuthPromises = new Map<
+  string,
+  Promise<{ userId: string } | null>
+>();
 
 async function callKvRpc(
   fnName: "eduon_get_state" | "eduon_set_state",
@@ -64,28 +76,46 @@ export async function hydrateRuntimeFromSupabaseKv(force = false): Promise<void>
     return;
   }
   const now = Date.now();
-  if (!force && now - lastKvHydratedAt < 1500) {
+  if (!force && lastKvHydratedAt > 0 && now - lastKvHydratedAt < KV_HYDRATE_TTL_MS) {
     return;
   }
-  lastKvHydratedAt = now;
-  try {
-    const [settingsVal, snapshotVal] = await Promise.all([
-      callKvRpc("eduon_get_state", { p_key: "platform_settings" }),
-      callKvRpc("eduon_get_state", { p_key: "runtime_snapshot" }),
-    ]);
-    if (settingsVal && typeof settingsVal === "object") {
-      hydrateRuntimeSettingsFromMetadata({
-        eduon_platform_settings: settingsVal,
-      });
-    }
-    if (snapshotVal && typeof snapshotVal === "object") {
-      hydrateRuntimeDbFromMetadata({
-        eduon_runtime_snapshot: snapshotVal,
-      });
-    }
-  } catch {
-    // ignore transient network errors
+  if (!force && inflightHydrationPromise) {
+    return inflightHydrationPromise;
   }
+  const task = (async () => {
+    try {
+      const snapshotVal = (await callKvRpc("eduon_get_state", {
+        p_key: "runtime_snapshot",
+      })) as Record<string, unknown> | null;
+      if (snapshotVal && typeof snapshotVal === "object") {
+        const embeddedSettings = snapshotVal._platform_settings;
+        if (embeddedSettings && typeof embeddedSettings === "object") {
+          hydrateRuntimeSettingsFromMetadata({
+            eduon_platform_settings: embeddedSettings,
+          });
+        } else {
+          const settingsVal = await callKvRpc("eduon_get_state", {
+            p_key: "platform_settings",
+          });
+          if (settingsVal && typeof settingsVal === "object") {
+            hydrateRuntimeSettingsFromMetadata({
+              eduon_platform_settings: settingsVal,
+            });
+          }
+        }
+        hydrateRuntimeDbFromMetadata({
+          eduon_runtime_snapshot: snapshotVal,
+        });
+        lastKvHydratedAt = Date.now();
+      }
+    } catch {
+      // ignore transient network errors
+    } finally {
+      inflightHydrationPromise = null;
+    }
+  })();
+  inflightHydrationPromise = task;
+  return task;
 }
 
 export async function createAuthClient() {
@@ -157,45 +187,96 @@ export async function getActor() {
     return user && !user.disabledAt ? { userId: user.id } : null;
   }
   await hydrateRuntimeFromSupabaseKv();
-  try {
-    const supabase = await createAuthClient();
-    const { data, error } = await supabase.auth.getUser();
-    if (!error && data.user?.email && data.user.email_confirmed_at) {
-      const identity = data.user;
-      const userMeta = identity.user_metadata as
-        | Record<string, unknown>
-        | undefined;
-      hydrateRuntimeSettingsFromMetadata(userMeta);
-      hydrateRuntimeDbFromMetadata(userMeta);
-      const normalizedEmail = identity.email!.toLowerCase();
-      const appMeta = (identity.app_metadata ?? {}) as Record<string, unknown>;
-      const isSupabaseMetaAdmin =
-        appMeta.role === "admin" ||
-        appMeta.role === "platform_admin" ||
-        appMeta.platform_admin === true ||
-        appMeta.platformAdmin === true ||
-        normalizedEmail === "admin@eduon.kr";
-      const shouldGrantAdmin =
-        isConfiguredAdminEmail(normalizedEmail) || isSupabaseMetaAdmin;
-      if (isUsingRuntimeDatabase()) {
-        ensureRuntimeUserProvisioned(identity.id, normalizedEmail);
+
+  const allCookies = jar.getAll();
+  const sbCookieKey =
+    process.env.NODE_ENV !== "test"
+      ? allCookies
+          .filter((c) => c.name.startsWith("sb-") && c.value)
+          .map((c) => `${c.name}=${c.value.slice(-48)}`)
+          .join(";")
+      : "";
+
+  if (sbCookieKey) {
+    const cached = authIdentityCache.get(sbCookieKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      const user = await db.user.findUnique({ where: { id: cached.userId } });
+      if (user && !user.disabledAt) {
+        return { userId: user.id };
       }
-      const user = await db.user.upsert({
-        where: { id: identity.id },
-        create: {
-          id: identity.id,
-          email: normalizedEmail,
-          ...(shouldGrantAdmin ? { platformAdmin: true } : {}),
-        },
-        update: {
-          email: normalizedEmail,
-          ...(shouldGrantAdmin ? { platformAdmin: true } : {}),
-        },
-      });
-      return !user.disabledAt ? { userId: user.id } : null;
     }
-  } catch {
-    // fallback to signed admin session cookie below
+    const inflight = inflightAuthPromises.get(sbCookieKey);
+    if (inflight) {
+      return inflight;
+    }
+  }
+
+  const resolveSupabaseUser = async (): Promise<{ userId: string } | null> => {
+    try {
+      const supabase = await createAuthClient();
+      const { data, error } = await supabase.auth.getUser();
+      if (!error && data.user?.email && data.user.email_confirmed_at) {
+        const identity = data.user;
+        const userMeta = identity.user_metadata as
+          | Record<string, unknown>
+          | undefined;
+        hydrateRuntimeSettingsFromMetadata(userMeta);
+        hydrateRuntimeDbFromMetadata(userMeta);
+        const normalizedEmail = identity.email!.toLowerCase();
+        const appMeta = (identity.app_metadata ?? {}) as Record<string, unknown>;
+        const isSupabaseMetaAdmin =
+          appMeta.role === "admin" ||
+          appMeta.role === "platform_admin" ||
+          appMeta.platform_admin === true ||
+          appMeta.platformAdmin === true ||
+          normalizedEmail === "admin@eduon.kr";
+        const shouldGrantAdmin =
+          isConfiguredAdminEmail(normalizedEmail) || isSupabaseMetaAdmin;
+        if (isUsingRuntimeDatabase()) {
+          ensureRuntimeUserProvisioned(identity.id, normalizedEmail);
+        }
+        const user = await db.user.upsert({
+          where: { id: identity.id },
+          create: {
+            id: identity.id,
+            email: normalizedEmail,
+            ...(shouldGrantAdmin ? { platformAdmin: true } : {}),
+          },
+          update: {
+            email: normalizedEmail,
+            ...(shouldGrantAdmin ? { platformAdmin: true } : {}),
+          },
+        });
+        if (!user.disabledAt) {
+          if (sbCookieKey) {
+            authIdentityCache.set(sbCookieKey, {
+              userId: user.id,
+              expiresAt: Date.now() + AUTH_CACHE_TTL_MS,
+            });
+          }
+          return { userId: user.id };
+        }
+        return null;
+      }
+    } catch {
+      // fallback to signed admin session cookie below
+    }
+    return null;
+  };
+
+  if (sbCookieKey) {
+    const promise = resolveSupabaseUser().finally(() => {
+      inflightAuthPromises.delete(sbCookieKey);
+    });
+    inflightAuthPromises.set(sbCookieKey, promise);
+    const resolved = await promise;
+    if (resolved) return resolved;
+  } else if (
+    process.env.NODE_ENV === "test" ||
+    allCookies.some((c) => c.name.startsWith("sb-"))
+  ) {
+    const resolved = await resolveSupabaseUser();
+    if (resolved) return resolved;
   }
 
   const adminCookie = jar.get("eduon-admin-session")?.value || "";
